@@ -23,6 +23,7 @@ jobs:
           set -euo pipefail
           node --check cloudflare/src/auth.js
           node --check cloudflare/src/preview.js
+          node --test test/quota-policy.test.mjs
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
           import fs from 'node:fs';
