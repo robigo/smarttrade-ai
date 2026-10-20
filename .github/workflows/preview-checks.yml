@@ -19,7 +19,7 @@ jobs:
         run: |
           node --check cloudflare/src/auth.js
           node --check cloudflare/src/preview.js
-          node --test test/quota-policy.test.mjs
+          node --test test/*.test.mjs
           node --check cloudflare/src/market-quota-do.mjs
       - name: Validate isolated preview config and assets
         run: |
