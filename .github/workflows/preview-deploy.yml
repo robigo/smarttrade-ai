@@ -53,7 +53,13 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          # Normalize copy/paste artifacts without logging the account identifier.
+          CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '\\r\\n\\t ' | tr -d '"')"
+          export CLOUDFLARE_ACCOUNT_ID
+          if ! [[ "$CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9a-fA-F]{32}$ ]]; then
+            echo "::error::Cloudflare Account ID must be exactly 32 hexadecimal characters (after normalization)."
+            exit 1
+          fi
           npx --yes wrangler@4.151.2 deploy --config wrangler.preview.json
       - name: Check preview health
         run: |
