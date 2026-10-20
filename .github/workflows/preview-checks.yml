@@ -20,6 +20,7 @@ jobs:
           node --check cloudflare/src/auth.js
           node --check cloudflare/src/preview.js
           node --test test/quota-policy.test.mjs
+          node --check cloudflare/src/market-quota-do.mjs
       - name: Validate isolated preview config and assets
         run: |
           node --input-type=module <<'JS'
@@ -29,6 +30,8 @@ jobs:
           assert.equal(cfg.name,'smarttrade-ai-preview');
           assert.equal(cfg.main,'cloudflare/src/preview.js');
           assert.equal(cfg.assets.directory,'./preview-public');
+          assert.equal(cfg.durable_objects.bindings[0].name,'MARKET_QUOTA');
+          assert.equal(cfg.migrations[0].new_sqlite_classes[0],'MarketQuota');
           const html=fs.readFileSync('preview-public/index.html','utf8');
           assert.match(html,/SmartTrade AI/);
           assert.doesNotMatch(html,/GOOGLE_CLIENT_SECRET\s*[:=]/);
