@@ -1,3 +1,4 @@
+import { handleAuth } from "./auth.js";
 // SmartTrade AI private quote gateway - not connected to public GitHub Pages.
 // Never place secrets in this source file or expose restricted quotes publicly.
 const allowed = new Set(["AAPL", "MSFT", "SPY"]);
@@ -13,6 +14,7 @@ function equalTokens(a,b) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/auth/")) return handleAuth(request, env, url);
     if (url.pathname === "/health" && request.method === "GET") return response({status:"ok",service:"smarttrade-private-gateway",quotes:"restricted"});
     if (url.pathname !== "/api/quote") return response({error:"not_found"},404);
     if (request.method !== "GET") return response({error:"method_not_allowed"},405);
