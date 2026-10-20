@@ -2,6 +2,7 @@ name: SmartTrade Preview UI Smoke Tests
 on:
   push:
     branches:
+      - preview/cloudflare-unified-v09
       - test/preview-ui-smoke-20261020
   workflow_dispatch:
 permissions:
