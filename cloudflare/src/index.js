@@ -25,7 +25,9 @@ export default {
       // Temporary diagnostics in Cloudflare's authenticated runtime logs only.
       // Never log header values, tokens, API keys, hashes, or exact lengths.
       console.info("SMARTTRADE_AUTH_DIAGNOSTIC",JSON.stringify({
-        tokenConfigured, apiKeyConfigured, bearerProvided, tokenMatches:false
+        tokenConfigured, apiKeyConfigured, bearerProvided, tokenMatches:false,
+        tokenValueType: typeof env.SMARTTRADE_ACCESS_TOKEN,
+        tokenLengthCategory: typeof env.SMARTTRADE_ACCESS_TOKEN !== "string" ? "not_string" : env.SMARTTRADE_ACCESS_TOKEN.length === 64 ? "exactly_64" : env.SMARTTRADE_ACCESS_TOKEN.length < 32 ? "under_32" : "other_length"
       }));
       return response({error:"unauthorized"},401);
     }
