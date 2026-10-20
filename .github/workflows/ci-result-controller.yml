@@ -1,5 +1,7 @@
 name: SmartTrade CI Result Controller
 on:
+  push:
+    branches: [test/ci-result-controller-20261020]
   workflow_run:
     workflows:
       - SmartTrade Preview Deploy
@@ -32,9 +34,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     env:
-      INPUT_WORKFLOW_NAME: ${{ inputs.workflow_name }}
-      INPUT_CONCLUSION: ${{ inputs.conclusion }}
-      INPUT_BRANCH: ${{ inputs.branch }}
+      INPUT_WORKFLOW_NAME: ${{ inputs.workflow_name || 'SmartTrade Preview Checks' }}
+      INPUT_CONCLUSION: ${{ inputs.conclusion || 'success' }}
+      INPUT_BRANCH: ${{ inputs.branch || 'preview/cloudflare-unified-v09' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
