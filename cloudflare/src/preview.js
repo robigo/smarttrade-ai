@@ -18,6 +18,12 @@ export default {
       // Requires explicit operator enablement after confirming display rights.
       if(env.MARKET_DISPLAY_APPROVED!=='true')return json({error:'market_display_disabled'},403);
       if(!env.TWELVE_DATA_API_KEY)return json({error:'provider_not_configured'},503);
+      // Global per-account quota guard: Cloudflare cache coordinates concurrent requests
+      // across isolates, avoiding one provider request per visitor click.
+      const cache=caches.default;
+      const cachedKey=new Request('https://smarttrade-preview-cache.invalid/quote/'+encodeURIComponent(url.searchParams.get('symbol')||''));
+      const cached=await cache.match(cachedKey);
+      if(cached)return cached;
       const symbol=url.searchParams.get('symbol');
       if(!['AAPL','MSFT','SPY'].includes(symbol))return json({error:'unsupported_symbol'},400);
       try{
@@ -29,7 +35,12 @@ export default {
         const data=await upstream.json();
         const price=Number(data.close);
         if(data.status==='error'||!Number.isFinite(price)||price<=0)return json({error:'invalid_provider_response'},502);
-        return json({symbol,price,currency:'USD',source:'Twelve Data',providerTime:data.datetime||null,receivedAt:new Date().toISOString(),note:'Provider quote may be delayed or non-consolidated'});
+        const payload={symbol,price,currency:'USD',source:'Twelve Data',providerTime:data.datetime||null,receivedAt:new Date().toISOString(),note:'Provider quote may be delayed or non-consolidated'};
+        const response=json(payload);
+        // Do not activate automatic provider polling. Short-lived edge cache only.
+        const cacheable=new Response(JSON.stringify(payload),{headers:{'content-type':'application/json','cache-control':'public, max-age=60'}});
+        await cache.put(cachedKey,cacheable);
+        return response;
       }catch{return json({error:'provider_unavailable'},502)}
     }
     if(url.pathname.startsWith('/api/')) return new Response(JSON.stringify({error:'preview_endpoint_disabled'}),{status:404,headers:{'content-type':'application/json','cache-control':'no-store'}});
