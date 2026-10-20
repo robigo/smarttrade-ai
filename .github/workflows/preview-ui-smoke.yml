@@ -23,5 +23,15 @@ jobs:
         run: |
           python3 -m http.server 8765 --bind 127.0.0.1 --directory preview-public > /tmp/smarttrade-ui-server.log 2>&1 &
           echo $! > /tmp/smarttrade-ui-server.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --output /dev/null http://127.0.0.1:8765/; then
+              echo 'Local preview server is ready'
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/smarttrade-ui-server.log
+          echo 'Local preview server did not become ready'
+          exit 1
       - name: Run paper-trading browser smoke tests
         run: node test/preview-ui-smoke.mjs
