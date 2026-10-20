@@ -11,6 +11,27 @@ export default {
       if(!session)return new Response(JSON.stringify({error:'unauthorized'}),{status:401,headers:{'content-type':'application/json','cache-control':'no-store'}});
       return new Response(JSON.stringify({authenticated:true,quotesEnabled:false,reason:'provider_display_license_not_verified',symbols:['AAPL','MSFT','SPY']}),{headers:{'content-type':'application/json','cache-control':'no-store'}});
     }
+    if(url.pathname==='/api/market/quote'){
+      const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json','cache-control':'no-store','x-content-type-options':'nosniff'}});
+      if(request.method!=='GET')return json({error:'method_not_allowed'},405);
+      if(!await getAuthorizedSession(request,env))return json({error:'unauthorized'},401);
+      // Requires explicit operator enablement after confirming display rights.
+      if(env.MARKET_DISPLAY_APPROVED!=='true')return json({error:'market_display_disabled'},403);
+      if(!env.TWELVE_DATA_API_KEY)return json({error:'provider_not_configured'},503);
+      const symbol=url.searchParams.get('symbol');
+      if(!['AAPL','MSFT','SPY'].includes(symbol))return json({error:'unsupported_symbol'},400);
+      try{
+        const upstreamUrl=new URL('https://api.twelvedata.com/quote');
+        upstreamUrl.searchParams.set('symbol',symbol);
+        upstreamUrl.searchParams.set('apikey',env.TWELVE_DATA_API_KEY);
+        const upstream=await fetch(upstreamUrl,{headers:{accept:'application/json'},signal:AbortSignal.timeout(8000)});
+        if(!upstream.ok)return json({error:'provider_unavailable'},502);
+        const data=await upstream.json();
+        const price=Number(data.close);
+        if(data.status==='error'||!Number.isFinite(price)||price<=0)return json({error:'invalid_provider_response'},502);
+        return json({symbol,price,currency:'USD',source:'Twelve Data',providerTime:data.datetime||null,receivedAt:new Date().toISOString(),note:'Provider quote may be delayed or non-consolidated'});
+      }catch{return json({error:'provider_unavailable'},502)}
+    }
     if(url.pathname.startsWith('/api/')) return new Response(JSON.stringify({error:'preview_endpoint_disabled'}),{status:404,headers:{'content-type':'application/json','cache-control':'no-store'}});
     return env.ASSETS.fetch(request);
   }
