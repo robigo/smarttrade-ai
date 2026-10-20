@@ -72,3 +72,12 @@ export async function handleAuth(req,env,url){
   }
   return json({error:'not_found'},404);
 }
+
+// Shared server-side session validation for protected preview routes.
+export async function getAuthorizedSession(req,env){
+  if(!ready(env))return null;
+  const session=await unseal(env.GOOGLE_SESSION_SECRET,getCookie(req,'st_session'));
+  if(!session||typeof session.exp!=='number'||session.exp<=Date.now()||typeof session.sub!=='string'||!session.sub||typeof session.email!=='string')return null;
+  if(session.email.toLowerCase()!==env.GOOGLE_ALLOWED_EMAIL.trim().toLowerCase())return null;
+  return {sub:session.sub};
+}
