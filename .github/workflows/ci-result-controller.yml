@@ -1,0 +1,46 @@
+name: SmartTrade CI Result Controller
+on:
+  workflow_run:
+    workflows:
+      - SmartTrade Preview Deploy
+      - SmartTrade Preview Checks
+      - SmartTrade Preview UI Smoke Tests
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      workflow_name:
+        description: Source workflow name
+        required: true
+        type: choice
+        options:
+          - SmartTrade Preview Deploy
+          - SmartTrade Preview Checks
+          - SmartTrade Preview UI Smoke Tests
+      conclusion:
+        description: Completed run conclusion
+        required: true
+        type: choice
+        options: [success, failure, cancelled]
+      branch:
+        description: Source branch
+        required: true
+        default: preview/cloudflare-unified-v09
+permissions:
+  contents: read
+jobs:
+  process-result:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      INPUT_WORKFLOW_NAME: ${{ inputs.workflow_name }}
+      INPUT_CONCLUSION: ${{ inputs.conclusion }}
+      INPUT_BRANCH: ${{ inputs.branch }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test controller decisions
+        run: node --test test/ci-result-controller.test.mjs
+      - name: Evaluate result and advance to public health check
+        run: node scripts/ci-result-controller.mjs
