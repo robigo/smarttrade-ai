@@ -46,7 +46,13 @@ export async function handleAuth(req,env,url){
     try{
       const body=new URLSearchParams({code:url.searchParams.get('code'),client_id:env.GOOGLE_CLIENT_ID,client_secret:env.GOOGLE_CLIENT_SECRET,redirect_uri:redirectUri,grant_type:'authorization_code',code_verifier:tx.verifier});
       const r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body,signal:AbortSignal.timeout(10000)});
-      if(!r.ok)throw Error('exchange');
+      if(!r.ok){
+        // Google's documented error code only; never log error_description, tokens or codes.
+        let googleError='unknown';
+        try { const payload=await r.json(); if(['invalid_client','invalid_grant','invalid_request','unauthorized_client','unsupported_grant_type'].includes(payload?.error)) googleError=payload.error; } catch {}
+        console.warn('SMARTTRADE_GOOGLE_TOKEN_RESPONSE',{status:r.status,error:googleError});
+        throw Error('exchange');
+      }
       const tokens=await r.json();
       stage='id_token_verification';
       const p=await verifyIdToken(tokens.id_token,env.GOOGLE_CLIENT_ID,tx.nonce);
