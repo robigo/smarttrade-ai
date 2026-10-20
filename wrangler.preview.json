@@ -8,5 +8,21 @@
     "directory": "./preview-public",
     "binding": "ASSETS",
     "run_worker_first": true
-  }
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MARKET_QUOTA",
+        "class_name": "MarketQuota"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1_market_quota",
+      "new_sqlite_classes": [
+        "MarketQuota"
+      ]
+    }
+  ]
 }
