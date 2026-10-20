@@ -19,6 +19,7 @@ jobs:
         run: |
           node --check cloudflare/src/auth.js
           node --check cloudflare/src/preview.js
+          node --test test/quota-policy.test.mjs
       - name: Validate isolated preview config and assets
         run: |
           node --input-type=module <<'JS'
