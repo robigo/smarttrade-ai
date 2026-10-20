@@ -42,18 +42,21 @@ export async function handleAuth(req,env,url){
     const tx=await unseal(env.GOOGLE_SESSION_SECRET,getCookie(req,'st_oauth'));
     const headers=new Headers({'cache-control':'no-store','set-cookie':cookie('st_oauth','',0)});
     if(!tx||tx.exp<Date.now()||url.searchParams.get('state')!==tx.state||!url.searchParams.get('code'))return json({error:'invalid_oauth_state'},401,Object.fromEntries(headers));
+    let stage='token_exchange';
     try{
       const body=new URLSearchParams({code:url.searchParams.get('code'),client_id:env.GOOGLE_CLIENT_ID,client_secret:env.GOOGLE_CLIENT_SECRET,redirect_uri:redirectUri,grant_type:'authorization_code',code_verifier:tx.verifier});
       const r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body,signal:AbortSignal.timeout(10000)});
       if(!r.ok)throw Error('exchange');
       const tokens=await r.json();
+      stage='id_token_verification';
       const p=await verifyIdToken(tokens.id_token,env.GOOGLE_CLIENT_ID,tx.nonce);
       if(p.email.toLowerCase()!==env.GOOGLE_ALLOWED_EMAIL.trim().toLowerCase())return json({error:'not_authorized'},403,Object.fromEntries(headers));
+      stage='session_creation';
       const session=await seal(env.GOOGLE_SESSION_SECRET,{sub:p.sub,email:p.email,exp:Date.now()+3600000});
       headers.append('set-cookie',cookie('st_session',session,3600));
       headers.set('location','/auth/me');
       return new Response(null,{status:302,headers});
-    }catch{return json({error:'google_auth_failed'},401,Object.fromEntries(headers))}
+    }catch{console.warn('SMARTTRADE_GOOGLE_AUTH_STAGE',stage);return json({error:'google_auth_failed'},401,Object.fromEntries(headers))}
   }
   if(path==='/auth/logout')return new Response(null,{status:302,headers:{location:home,'set-cookie':cookie('st_session','',0),'cache-control':'no-store'}});
   if(path==='/auth/me'){
