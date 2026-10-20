@@ -5,7 +5,7 @@ const from64=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')+'='.r
 const rand=n=>b64u(crypto.getRandomValues(new Uint8Array(n)));
 const cookie=(name,value,age)=>name+'='+value+'; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age='+age;
 const json=(body,status=200,headers={})=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json','cache-control':'no-store',...headers}});
-async function mac(secret,message){const key=await crypto.subtle.importKey('raw',te.encode(secret),'HMAC',false,['sign']);return b64u(await crypto.subtle.sign('HMAC',key,te.encode(message)))}
+async function mac(secret,message){const key=await crypto.subtle.importKey('raw',te.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);return b64u(await crypto.subtle.sign('HMAC',key,te.encode(message)))}
 async function seal(secret,obj){const data=b64u(te.encode(JSON.stringify(obj)));return data+'.'+await mac(secret,data)}
 async function unseal(secret,value){if(!value||!value.includes('.'))return null;const [data,sig]=value.split('.');if(!data||!sig||await mac(secret,data)!==sig)return null;try{return JSON.parse(new TextDecoder().decode(from64(data)))}catch{return null}}
 function getCookie(req,name){return (req.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(name+'='))?.slice(name.length+1)}
