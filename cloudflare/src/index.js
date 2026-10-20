@@ -14,7 +14,20 @@ function equalTokens(a,b) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/auth/")) return handleAuth(request, env, url);
+    if (url.pathname === "/auth/me" && request.method === "OPTIONS" && request.headers.get("Origin") === "https://robigo.github.io") {
+      return new Response(null,{status:204,headers:{"Access-Control-Allow-Origin":"https://robigo.github.io","Access-Control-Allow-Credentials":"true","Access-Control-Allow-Methods":"GET, OPTIONS","Access-Control-Allow-Headers":"Content-Type","Vary":"Origin","Cache-Control":"no-store"}});
+    }
+    if (url.pathname.startsWith("/auth/")) {
+      const result=await handleAuth(request, env, url);
+      if (url.pathname === "/auth/me" && request.headers.get("Origin") === "https://robigo.github.io") {
+        const headers=new Headers(result.headers);
+        headers.set("Access-Control-Allow-Origin","https://robigo.github.io");
+        headers.set("Access-Control-Allow-Credentials","true");
+        headers.set("Vary","Origin");
+        return new Response(result.body,{status:result.status,headers});
+      }
+      return result;
+    }
     if (url.pathname === "/health" && request.method === "GET") return response({status:"ok",service:"smarttrade-private-gateway",quotes:"restricted"});
     if (url.pathname !== "/api/quote") return response({error:"not_found"},404);
     if (request.method !== "GET") return response({error:"method_not_allowed"},405);
