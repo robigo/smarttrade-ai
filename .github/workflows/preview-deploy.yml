@@ -24,6 +24,7 @@ jobs:
           node --check cloudflare/src/auth.js
           node --check cloudflare/src/preview.js
           node --test test/quota-policy.test.mjs
+          node --check cloudflare/src/market-quota-do.mjs
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
           import fs from 'node:fs';
@@ -32,6 +33,8 @@ jobs:
           assert.equal(cfg.main,'cloudflare/src/preview.js');
           assert.equal(cfg.workers_dev,true);
           assert.equal(cfg.assets.directory,'./preview-public');
+          assert.equal(cfg.durable_objects.bindings[0].name,'MARKET_QUOTA');
+          assert.equal(cfg.migrations[0].new_sqlite_classes[0],'MarketQuota');
           assert.equal(cfg.assets.binding,'ASSETS');
           assert.equal(cfg.assets.run_worker_first,true);
           assert.match(fs.readFileSync('preview-public/index.html','utf8'),/SmartTrade AI/);
