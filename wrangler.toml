@@ -1,0 +1,8 @@
+name = "smarttrade-ai"
+main = "cloudflare/src/index.js"
+compatibility_date = "2026-10-19"
+workers_dev = true
+preview_urls = false
+
+# No assets directory: deploy only the Worker script.
+# Keep TWELVE_DATA_API_KEY and SMARTTRADE_ACCESS_TOKEN as Cloudflare secrets.
