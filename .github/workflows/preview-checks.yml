@@ -1,0 +1,38 @@
+name: SmartTrade Preview Checks
+on:
+  push:
+    branches: [preview/cloudflare-unified-v09]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check Worker modules
+        run: |
+          node --check cloudflare/src/auth.js
+          node --check cloudflare/src/preview.js
+      - name: Validate isolated preview config and assets
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const cfg=JSON.parse(fs.readFileSync('wrangler.preview.json','utf8'));
+          assert.equal(cfg.name,'smarttrade-ai-preview');
+          assert.equal(cfg.main,'cloudflare/src/preview.js');
+          assert.equal(cfg.assets.directory,'./preview-public');
+          const html=fs.readFileSync('preview-public/index.html','utf8');
+          assert.match(html,/SmartTrade AI/);
+          assert.doesNotMatch(html,/GOOGLE_CLIENT_SECRET\s*[:=]/);
+          assert.doesNotMatch(html,/TWELVE_DATA_API_KEY\s*[:=]/);
+          const worker=fs.readFileSync('cloudflare/src/preview.js','utf8');
+          assert.match(worker,/getAuthorizedSession/);
+          console.log('Preview checks passed');
+          JS
