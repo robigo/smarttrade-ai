@@ -60,7 +60,7 @@ export async function handleAuth(req,env,url){
       stage='session_creation';
       const session=await seal(env.GOOGLE_SESSION_SECRET,{sub:p.sub,email:p.email,exp:Date.now()+3600000});
       headers.append('set-cookie',cookie('st_session',session,3600));
-      headers.set('location','/auth/me');
+      headers.set('location',home);
       return new Response(null,{status:302,headers});
     }catch{console.warn('SMARTTRADE_GOOGLE_AUTH_STAGE',stage);return json({error:'google_auth_failed'},401,Object.fromEntries(headers))}
   }
