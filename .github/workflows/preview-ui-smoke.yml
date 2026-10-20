@@ -4,6 +4,7 @@ on:
     branches:
       - preview/cloudflare-unified-v09
       - test/preview-ui-smoke-20261020
+      - test/ci-result-controller-20261020
   workflow_dispatch:
 permissions:
   contents: read
@@ -36,3 +37,17 @@ jobs:
           exit 1
       - name: Run paper-trading browser smoke tests
         run: node test/preview-ui-smoke.mjs
+  readiness-report:
+    needs: browser-smoke
+    if: github.ref == 'refs/heads/preview/cloudflare-unified-v09' || github.ref == 'refs/heads/test/ci-result-controller-20261020'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify decision rules
+        run: node --test test/ci-result-controller.test.mjs
+      - name: Generate pre-production blocker report
+        run: node scripts/production-readiness.mjs
