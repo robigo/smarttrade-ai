@@ -9,7 +9,7 @@ export default {
       if(request.method!=='GET')return new Response(JSON.stringify({error:'method_not_allowed'}),{status:405,headers:{'content-type':'application/json','cache-control':'no-store'}});
       const session=await getAuthorizedSession(request,env);
       if(!session)return new Response(JSON.stringify({error:'unauthorized'}),{status:401,headers:{'content-type':'application/json','cache-control':'no-store'}});
-      return new Response(JSON.stringify({authenticated:true,quotesEnabled:false,reason:'provider_display_license_not_verified',symbols:['AAPL','MSFT','SPY']}),{headers:{'content-type':'application/json','cache-control':'no-store'}});
+      return new Response(JSON.stringify({authenticated:true,quotesEnabled:env.MARKET_DISPLAY_APPROVED==='true'&&Boolean(env.TWELVE_DATA_API_KEY),reason:env.MARKET_DISPLAY_APPROVED==='true'?(env.TWELVE_DATA_API_KEY?'enabled':'provider_not_configured'):'display_disabled',symbols:['AAPL','MSFT','SPY']}),{headers:{'content-type':'application/json','cache-control':'no-store'}});
     }
     if(url.pathname==='/api/market/quote'){
       const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json','cache-control':'no-store','x-content-type-options':'nosniff'}});
