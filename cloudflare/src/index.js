@@ -17,20 +17,7 @@ export default {
     if (url.pathname !== "/api/quote") return response({error:"not_found"},404);
     if (request.method !== "GET") return response({error:"method_not_allowed"},405);
     const header=request.headers.get("authorization")||"";
-    const tokenConfigured = typeof env.SMARTTRADE_ACCESS_TOKEN === "string" && env.SMARTTRADE_ACCESS_TOKEN.length >= 32;
-    const apiKeyConfigured = typeof env.TWELVE_DATA_API_KEY === "string" && env.TWELVE_DATA_API_KEY.length > 0;
-    const bearerProvided = header.startsWith("Bearer ");
-    const tokenMatches = tokenConfigured && bearerProvided && equalTokens(header.slice(7),env.SMARTTRADE_ACCESS_TOKEN);
-    if (!tokenMatches) {
-      // Temporary diagnostics in Cloudflare's authenticated runtime logs only.
-      // Never log header values, tokens, API keys, hashes, or exact lengths.
-      console.info("SMARTTRADE_AUTH_DIAGNOSTIC",JSON.stringify({
-        tokenConfigured, apiKeyConfigured, bearerProvided, tokenMatches:false,
-        tokenValueType: typeof env.SMARTTRADE_ACCESS_TOKEN,
-        tokenLengthCategory: typeof env.SMARTTRADE_ACCESS_TOKEN !== "string" ? "not_string" : env.SMARTTRADE_ACCESS_TOKEN.length === 64 ? "exactly_64" : env.SMARTTRADE_ACCESS_TOKEN.length < 32 ? "under_32" : "other_length"
-      }));
-      return response({error:"unauthorized"},401);
-    }
+    if (!env.SMARTTRADE_ACCESS_TOKEN || env.SMARTTRADE_ACCESS_TOKEN.length < 32 || !header.startsWith("Bearer ") || !equalTokens(header.slice(7), env.SMARTTRADE_ACCESS_TOKEN)) return response({error:"unauthorized"},401);
     if (!env.TWELVE_DATA_API_KEY) return response({error:"server_not_configured"},503);
     const symbol=url.searchParams.get("symbol");
     if (!allowed.has(symbol)) return response({error:"unsupported_symbol"},400);
