@@ -25,7 +25,7 @@ test('twenty concurrent reservations cannot exceed 400 cents',async()=>{
  const storage=fakeStore([]);
  const results=await Promise.all(Array.from({length:20},(_,i)=>reserveDurably(storage,args(i))));
  assert.equal(results.filter(r=>r.allowed).length,8);
- assert.equal(results.filter(r=>!r.allowed).length,8);
+ assert.equal(results.filter(r=>!r.allowed).length,12);
  assert.equal(storage.data.get('budget:2026-10').reservedCents,400);
 });
 test('duplicate request is not charged twice',async()=>{
