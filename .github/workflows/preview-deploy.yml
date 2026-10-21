@@ -210,3 +210,40 @@ jobs:
             echo 'Agent runner: NOT CONNECTED. No autonomous code generation or environment promotion occurred.'
             echo 'Open the individual jobs above for step-level timestamps and logs.'
           } >> "$GITHUB_STEP_SUMMARY"
+  codex_connection_preflight:
+    needs: [verify, next_task_gate]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai' && needs.verify.result == 'success' && needs.next_task_gate.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check Codex configuration without using credentials
+        env:
+          KEY_PRESENT: ${{ secrets.OPENAI_API_KEY != '' }}
+        run: |
+          node --input-type=module <<'JS'
+          import {codexPreflight} from './agent/codex-preflight.mjs';
+          const keyPresent=process.env.KEY_PRESENT==='true';
+          // Do not pass the API key into this job; presence is only a boolean.
+          const result=codexPreflight({
+            repository:process.env.GITHUB_REPOSITORY,
+            branch:process.env.GITHUB_REF_NAME,
+            monthlyBudgetUsd:5,
+            credentialsProvisioned:keyPresent,
+            hardStopVerified:false,
+            readOnlySandboxVerified:false,
+            liveQuotesEnabled:false,
+            productionAccess:false
+          });
+          if(result.ready || result.apiCallsEnabled)throw Error('Unsafe Codex activation');
+          const status=keyPresent?'present':'missing';
+          console.log(JSON.stringify({stage:'codex_preflight',secretStatus:status,ready:false,reason:result.reason,apiCallsMade:0}));
+          console.log('No API requests, paid operations, or autonomous code changes performed.');
+          JS
