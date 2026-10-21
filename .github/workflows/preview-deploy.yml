@@ -109,3 +109,25 @@ jobs:
           }
           console.log('Post-deploy anonymous-access checks passed; no quotes requested from provider.');
           JS
+  next_task_gate:
+    needs: [verify, deploy, post_deploy_auth_guard]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai' && needs.verify.result == 'success' && needs.deploy.result == 'success' && needs.post_deploy_auth_guard.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Publish safe next development gate
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo '## Preview checks passed — next development gate'
+            echo ''
+            echo "Verified commit: \`$COMMIT_SHA\`"
+            echo ''
+            echo 'Next candidate: add isolated regression tests for cache misses, invalid symbols and quota-denied responses.'
+            echo ''
+            echo 'Status: READY FOR AGENT PICKUP, NOT EXECUTED.'
+            echo 'This job has read-only permissions. It does not run an AI agent, create commits, enable quotes, or promote to staging/production.'
+            echo 'Agent execution requires a separately reviewed, least-privilege runner and explicit environment promotion gates.'
+          } >> "$GITHUB_STEP_SUMMARY"
