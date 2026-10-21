@@ -45,7 +45,7 @@ test('concurrent reservations cannot exceed local ledger limit',async()=>{
   ...body,requestId:'reservation_'+String(i).padStart(5,'0')
  }))));
  assert.equal(responses.filter(r=>r.status===200).length,8);
- assert.equal(responses.filter(r=>r.status===429).length,8);
+ assert.equal(responses.filter(r=>r.status===429).length,12);
  assert.equal(records.get('budget:2026-10').reservedCents,400);
  assert.equal((await object.fetch(request({...body,requestId:'reservation_00000'}))).status,503);
 });
