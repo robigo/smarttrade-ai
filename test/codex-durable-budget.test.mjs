@@ -45,3 +45,31 @@ test('storage failure does not grant reservation',async()=>{
  const storage={transaction:async()=>{throw Error('storage unavailable')}};
  await assert.rejects(reserveDurably(storage,args(1)),/storage unavailable/);
 });
+
+test('a failed second write cannot leave a partial budget reservation',async()=>{
+ const persisted=new Map([['budget:2026-10',{spentCents:0,reservedCents:0,reconciled:true}]]);
+ const storage={
+  async transaction(fn){
+   const staged=new Map(persisted);
+   const tx={
+    get:async key=>structuredClone(staged.get(key)),
+    put:async(key,value)=>{
+     if(key.startsWith('request:'))throw Error('request write failed');
+     staged.set(key,structuredClone(value));
+    }
+   };
+   const result=await fn(tx);
+   for(const [key,value] of staged)persisted.set(key,value);
+   return result;
+  }
+ };
+ await assert.rejects(reserveDurably(storage,args(42)),/request write failed/);
+ assert.equal(persisted.get('budget:2026-10').reservedCents,0);
+ assert.equal(persisted.has('request:2026-10:'+args(42).requestId),false);
+});
+test('a non-reconciled ledger never accepts new reservations',async()=>{
+ const storage=fakeStore([['budget:2026-10',{spentCents:0,reservedCents:0,reconciled:false}]]);
+ const result=await reserveDurably(storage,args(51));
+ assert.deepEqual(result,{allowed:false,reason:'unreconciled_ledger'});
+ assert.equal(storage.data.has('request:2026-10:'+args(51).requestId),false);
+});
