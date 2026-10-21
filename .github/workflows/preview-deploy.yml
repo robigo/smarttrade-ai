@@ -81,3 +81,31 @@ jobs:
           if(!ok)throw Error('Preview health check failed');
           console.log('Preview health check passed');
           JS
+  post_deploy_auth_guard:
+    needs: deploy
+    if: github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify deployed Preview rejects anonymous market requests
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const base='https://smarttrade-ai-preview.goshen-r.workers.dev';
+          for (const path of ['/api/market/status','/api/market/quote?symbol=AAPL']) {
+            const response=await fetch(base+path,{
+              headers:{accept:'application/json'},
+              redirect:'manual',
+              cache:'no-store',
+              signal:AbortSignal.timeout(8000)
+            });
+            assert.equal(response.status,401,`Expected 401 for ${path}, got ${response.status}`);
+            assert.equal(response.headers.get('cache-control'),'no-store');
+            const body=await response.json();
+            assert.equal(body.error,'unauthorized');
+          }
+          console.log('Post-deploy anonymous-access checks passed; no quotes requested from provider.');
+          JS
