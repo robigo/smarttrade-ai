@@ -60,3 +60,16 @@ test('budget reservations persist across Durable Object instance recreation',asy
  assert.equal(next.status,200);
  assert.equal(records.get('budget:2026-10').reservedCents,100);
 });
+
+test('internal ping is authenticated and does not initialize or spend budget',async()=>{
+ const {object,records}=makeDO();
+ const endpoint='https://budget.internal/internal/ping';
+ const unauthenticated=await object.fetch(new Request(endpoint,{method:'GET'}));
+ assert.equal(unauthenticated.status,401);
+ const authenticated=await object.fetch(new Request(endpoint,{
+  method:'GET',headers:{authorization:'Bearer '+secret}
+ }));
+ assert.equal(authenticated.status,200);
+ assert.deepEqual(await authenticated.json(),{connected:true,reservationsEnabled:false});
+ assert.equal(records.size,0);
+});
