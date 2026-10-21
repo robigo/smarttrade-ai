@@ -10,7 +10,7 @@ export function createBudgetGateway({verifyToken=verifyGitHubOidc}={}) {
         status,headers:{'content-type':'application/json','cache-control':'no-store','x-content-type-options':'nosniff'}
       });
       const url=new URL(request.url);
-      if(url.pathname!=='/internal/auth-check')return json({error:'not_found'},404);
+      if(!['/internal/auth-check','/internal/budget/ping'].includes(url.pathname))return json({error:'not_found'},404);
       if(request.method!=='POST')return json({error:'method_not_allowed'},405);
       // The audience must be set by the operator, never derived from the token.
       if(typeof env.CODEX_BUDGET_OIDC_AUDIENCE!=='string' ||
@@ -22,6 +22,24 @@ export function createBudgetGateway({verifyToken=verifyGitHubOidc}={}) {
       const verdict=await verifyToken(token,{audience:env.CODEX_BUDGET_OIDC_AUDIENCE});
       if(!verdict?.allowed || verdict.mode!=='read_only')
         return json({error:'unauthorized'},401);
+      if(url.pathname==='/internal/budget/ping'){
+        if(!env.CODEX_BUDGET || typeof env.CODEX_BUDGET.idFromName!=='function' ||
+           typeof env.CODEX_BUDGET.get!=='function' ||
+           typeof env.CODEX_BUDGET_INTERNAL_TOKEN!=='string' ||
+           env.CODEX_BUDGET_INTERNAL_TOKEN.length<32)
+          return json({error:'budget_binding_unavailable'},503);
+        try {
+          const stub=env.CODEX_BUDGET.get(env.CODEX_BUDGET.idFromName('codex-budget-sandbox-v1'));
+          const upstream=await stub.fetch(new Request('https://budget.internal/internal/ping',{
+            method:'GET',headers:{authorization:'Bearer '+env.CODEX_BUDGET_INTERNAL_TOKEN}
+          }));
+          if(!upstream.ok)return json({error:'budget_binding_unavailable'},503);
+          const status=await upstream.json();
+          if(status?.connected!==true||status?.reservationsEnabled!==false)
+            return json({error:'budget_binding_unavailable'},503);
+          return json({authenticated:true,budgetConnected:true,budgetReservationsEnabled:false},200);
+        }catch{return json({error:'budget_binding_unavailable'},503);}
+      }
       return json({authenticated:true,mode:'read_only',budgetReservationsEnabled:false},200);
     }
   };
