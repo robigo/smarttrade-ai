@@ -249,3 +249,22 @@ jobs:
           console.log(JSON.stringify({stage:'codex_preflight',secretStatus:status,ready:false,reason:result.reason,apiCallsMade:0}));
           console.log('No API requests, paid operations, or autonomous code changes performed.');
           JS
+      - name: Verify Codex task runner stays disabled until spending controls are proven
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {prepareCodexRun} from './agent/codex-runner-config.mjs';
+          const plan=prepareCodexRun({ready:true,mode:'read_only'},{
+            repository:process.env.GITHUB_REPOSITORY,
+            branch:process.env.GITHUB_REF_NAME,
+            monthlyBudgetUsd:5,
+            credentialsProvisioned:false,
+            hardStopVerified:false,
+            readOnlySandboxVerified:false,
+            liveQuotesEnabled:false,
+            productionAccess:false
+          });
+          assert.equal(plan.ready,false);
+          assert.equal(plan.reason,'hard_spend_stop_unverified');
+          console.log(JSON.stringify({stage:'codex_runner_dry_run',ready:false,reason:plan.reason,apiCallsMade:0}));
+          JS
