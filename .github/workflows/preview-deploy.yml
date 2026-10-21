@@ -131,3 +131,37 @@ jobs:
             echo 'This job has read-only permissions. It does not run an AI agent, create commits, enable quotes, or promote to staging/production.'
             echo 'Agent execution requires a separately reviewed, least-privilege runner and explicit environment promotion gates.'
           } >> "$GITHUB_STEP_SUMMARY"
+  monitor_summary:
+    needs: [verify, deploy, post_deploy_auth_guard, next_task_gate]
+    if: ${{ always() && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Publish timestamped execution status
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          AUTH_RESULT: ${{ needs.post_deploy_auth_guard.result }}
+          NEXT_RESULT: ${{ needs.next_task_gate.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo '## SmartTrade Preview — execution monitor'
+            echo ''
+            echo "Updated (UTC): $(date -u +'%Y-%m-%d %H:%M:%S')"
+            echo ''
+            echo "| Stage | Result |"
+            echo "| --- | --- |"
+            echo "| Regression tests | $VERIFY_RESULT |"
+            echo "| Preview deployment and health | $DEPLOY_RESULT |"
+            echo "| Anonymous access guard | $AUTH_RESULT |"
+            echo "| Next task handoff | $NEXT_RESULT |"
+            echo ''
+            echo "Commit: \`$COMMIT_SHA\`"
+            echo "Run: $RUN_URL"
+            echo ''
+            echo 'Agent runner: NOT CONNECTED. No autonomous code generation or environment promotion occurred.'
+            echo 'Open the individual jobs above for step-level timestamps and logs.'
+          } >> "$GITHUB_STEP_SUMMARY"
