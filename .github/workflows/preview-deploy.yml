@@ -307,3 +307,49 @@ jobs:
           assert.equal(verdict.allowed,true,'GitHub OIDC verification failed');
           assert.equal(verdict.mode,'read_only');
           JS
+      - name: Probe live isolated budget gateway with GitHub OIDC (read-only)
+        env:
+          EXPECTED_AUDIENCE: smarttrade-codex-budget
+          SANDBOX_ORIGIN: https://smarttrade-codex-budget-sandbox.goshen-r.workers.dev
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const base=new URL(process.env.SANDBOX_ORIGIN);
+          assert.equal(base.protocol,'https:');
+          assert.equal(base.hostname,'smarttrade-codex-budget-sandbox.goshen-r.workers.dev');
+          const url=new URL('/internal/budget/ping',base);
+          const anonymous=await fetch(url,{method:'POST',signal:AbortSignal.timeout(10000)});
+          assert.equal(anonymous.status,401,'Anonymous request must be rejected');
+          const reserve=await fetch(new URL('/reserve',base),{method:'POST',signal:AbortSignal.timeout(10000)});
+          assert.equal(reserve.status,404,'Public reservation endpoint must remain closed');
+          const oidcEndpoint=new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
+          assert.equal(oidcEndpoint.protocol,'https:');
+          oidcEndpoint.searchParams.set('audience',process.env.EXPECTED_AUDIENCE);
+          const tokenResponse=await fetch(oidcEndpoint,{
+            headers:{authorization:'Bearer '+process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN},
+            signal:AbortSignal.timeout(10000)
+          });
+          assert.equal(tokenResponse.status,200,'OIDC issuance failed');
+          const {value:token}=await tokenResponse.json();
+          assert.equal(typeof token,'string');
+          const response=await fetch(url,{
+            method:'POST',
+            headers:{authorization:'Bearer '+token},
+            signal:AbortSignal.timeout(15000)
+          });
+          const body=await response.json().catch(()=>({}));
+          console.log(JSON.stringify({
+            stage:'live_budget_oidc_ping',
+            status:response.status,
+            authenticated:body.authenticated===true,
+            budgetConnected:body.budgetConnected===true,
+            budgetReservationsEnabled:body.budgetReservationsEnabled,
+            anonymousStatus:anonymous.status,
+            reservationStatus:reserve.status,
+            codexCalls:0
+          }));
+          assert.equal(response.status,200,'Authenticated budget probe failed');
+          assert.equal(body.authenticated,true);
+          assert.equal(body.budgetConnected,true);
+          assert.equal(body.budgetReservationsEnabled,false);
+          JS
