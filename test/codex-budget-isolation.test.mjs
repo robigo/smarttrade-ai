@@ -9,7 +9,7 @@ test('budget config is isolated from existing preview and production',()=>{
  const preview=JSON.parse(fs.readFileSync(new URL('../wrangler.preview.json',import.meta.url)));
  assert.notEqual(cfg.name,preview.name);
  assert.equal(cfg.main,'cloudflare/src/codex-budget-worker.mjs');
- assert.equal(cfg.workers_dev,false);
+ assert.equal(cfg.workers_dev,true);
  assert.equal(cfg.preview_urls,false);
  assert.equal(cfg.vars.CODEX_BUDGET_OIDC_AUDIENCE,'smarttrade-codex-budget');
  assert.equal(Object.hasOwn(cfg.vars,'CODEX_BUDGET_INTERNAL_TOKEN'),false);
@@ -26,4 +26,16 @@ test('worker does not expose budget endpoints to anonymous HTTP requests',async(
   assert.equal(response.status,404);
   assert.equal(response.headers.get('cache-control'),'no-store');
  }
+});
+
+test('public HTTPS gateway refuses anonymous and unauthorized OIDC requests',async()=>{
+ const env={CODEX_BUDGET_OIDC_AUDIENCE:'smarttrade-codex-budget'};
+ const origin='https://sandbox.example.invalid';
+ for(const path of ['/internal/auth-check','/internal/budget/ping']){
+  const response=await worker.fetch(new Request(origin+path,{method:'POST'}),env);
+  assert.equal(response.status,401,path);
+  assert.equal(response.headers.get('cache-control'),'no-store');
+ }
+ const denied=await worker.fetch(new Request(origin+'/reserve',{method:'POST'}),env);
+ assert.equal(denied.status,404);
 });
