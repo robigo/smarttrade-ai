@@ -1,0 +1,52 @@
+name: SmartTrade Codex Budget Build Check
+on:
+  push:
+    branches:
+      - preview/cloudflare-unified-v09
+    paths:
+      - 'agent/codex-*.mjs'
+      - 'cloudflare/src/codex-budget-*.mjs'
+      - 'wrangler.codex-budget.json'
+      - 'test/codex-*.test.mjs'
+      - '.github/workflows/codex-budget-build-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dry-run:
+    if: github.repository == 'robigo/smarttrade-ai' && github.ref == 'refs/heads/preview/cloudflare-unified-v09'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run budget regression tests
+        run: |
+          set -euo pipefail
+          node --test test/codex-*.test.mjs
+      - name: Validate isolated target and compile without deploying
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const cfg=JSON.parse(fs.readFileSync('wrangler.codex-budget.json','utf8'));
+          assert.equal(cfg.name,'smarttrade-codex-budget-sandbox');
+          assert.equal(cfg.main,'cloudflare/src/codex-budget-worker.mjs');
+          assert.equal(cfg.workers_dev,false);
+          assert.equal(cfg.preview_urls,false);
+          assert.equal(cfg.durable_objects.bindings[0].class_name,'CodexBudget');
+          assert.deepEqual(cfg.migrations[0].new_sqlite_classes,['CodexBudget']);
+          console.log('Isolated budget configuration validated');
+          JS
+          node --check cloudflare/src/codex-budget-do.mjs
+          node --check cloudflare/src/codex-budget-worker.mjs
+          npx --yes wrangler@4.151.2 deploy --dry-run --config wrangler.codex-budget.json --outdir /tmp/codex-budget-build
+      - name: Record non-deployment result
+        if: ${{ success() }}
+        run: |
+          echo 'Codex budget Worker compiled in dry-run mode. No deployment, API calls, secrets or paid service activation occurred.' >> "$GITHUB_STEP_SUMMARY"
