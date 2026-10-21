@@ -40,9 +40,11 @@ jobs:
           assert.equal(cfg.main,'cloudflare/src/codex-budget-worker.mjs');
           assert.equal(cfg.workers_dev,false);
           assert.equal(cfg.preview_urls,false);
+          assert.equal(cfg.vars.CODEX_BUDGET_OIDC_AUDIENCE,'smarttrade-codex-budget');
           assert.equal(cfg.durable_objects.bindings.length,1);
           assert.equal(cfg.durable_objects.bindings[0].name,'CODEX_BUDGET');
           assert.deepEqual(cfg.migrations[0].new_sqlite_classes,['CodexBudget']);
+          assert.equal(Object.hasOwn(cfg.vars,'CODEX_BUDGET_INTERNAL_TOKEN'),false);
           JS
           node --test test/codex-*.test.mjs
           npx --yes wrangler@4.151.2 deploy --dry-run --config wrangler.codex-budget.json --outdir /tmp/codex-budget-build
