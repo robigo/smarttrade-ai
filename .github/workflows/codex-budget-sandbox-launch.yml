@@ -1,0 +1,71 @@
+name: Launch isolated Codex Budget Sandbox
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: 'Type smarttrade-codex-budget-sandbox to request a gated deployment'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: smarttrade-codex-budget-sandbox-launch
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: github.repository == 'robigo/smarttrade-ai' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check exact target
+        env:
+          CONFIRM_TARGET: ${{ inputs.confirm_target }}
+        run: |
+          test "$CONFIRM_TARGET" = 'smarttrade-codex-budget-sandbox'
+      - uses: actions/checkout@v4
+        with:
+          repository: robigo/smarttrade-ai
+          ref: 89931ea103728295d86a550f3e70a7dd7325b925
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify isolated preview code and dry-run
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          const c=JSON.parse(fs.readFileSync('wrangler.codex-budget.json','utf8'));
+          assert.equal(c.name,'smarttrade-codex-budget-sandbox');
+          assert.equal(c.main,'cloudflare/src/codex-budget-worker.mjs');
+          assert.equal(c.workers_dev,false);
+          assert.equal(c.preview_urls,false);
+          assert.deepEqual(c.durable_objects.bindings,[{name:'CODEX_BUDGET',class_name:'CodexBudget'}]);
+          assert.deepEqual(c.migrations[0].new_sqlite_classes,['CodexBudget']);
+          JS
+          node --test test/codex-*.test.mjs
+          npx --yes wrangler@4.151.2 deploy --dry-run --config wrangler.codex-budget.json
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: codex-budget-sandbox
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: robigo/smarttrade-ai
+          ref: 89931ea103728295d86a550f3e70a7dd7325b925
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Deploy sandbox only after environment approval
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx --yes wrangler@4.151.2 deploy --config wrangler.codex-budget.json
