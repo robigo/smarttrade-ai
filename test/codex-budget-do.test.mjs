@@ -27,7 +27,7 @@ function makeDO({initialized=false,fail=false}={}){
   queue=p.catch(()=>{});
   return p;
  }}};
- return {object:new CodexBudget(state,{CODEX_BUDGET_INTERNAL_TOKEN:secret}),records};
+ return {object:new CodexBudget(state,{CODEX_BUDGET_INTERNAL_TOKEN:secret}),records,state};
 }
 test('missing secret and unauthorized callers are denied',async()=>{
  const {object}=makeDO();
@@ -48,4 +48,15 @@ test('concurrent reservations cannot exceed local ledger limit',async()=>{
  assert.equal(responses.filter(r=>r.status===429).length,12);
  assert.equal(records.get('budget:2026-10').reservedCents,400);
  assert.equal((await object.fetch(request({...body,requestId:'reservation_00000'}))).status,503);
+});
+
+test('budget reservations persist across Durable Object instance recreation',async()=>{
+ const {object,state,records}=makeDO({initialized:true});
+ assert.equal((await object.fetch(request())).status,200);
+ const restarted=new CodexBudget(state,{CODEX_BUDGET_INTERNAL_TOKEN:secret});
+ assert.equal((await restarted.fetch(request())).status,503);
+ assert.equal(records.get('budget:2026-10').reservedCents,50);
+ const next=await restarted.fetch(request({...body,requestId:'reservation_00002'}));
+ assert.equal(next.status,200);
+ assert.equal(records.get('budget:2026-10').reservedCents,100);
 });
