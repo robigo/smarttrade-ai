@@ -38,7 +38,7 @@ jobs:
           const cfg=JSON.parse(fs.readFileSync('wrangler.codex-budget.json','utf8'));
           assert.equal(cfg.name,'smarttrade-codex-budget-sandbox');
           assert.equal(cfg.main,'cloudflare/src/codex-budget-worker.mjs');
-          assert.equal(cfg.workers_dev,false);
+          assert.equal(cfg.workers_dev,true);
           assert.equal(cfg.preview_urls,false);
           assert.equal(cfg.vars.CODEX_BUDGET_OIDC_AUDIENCE,'smarttrade-codex-budget');
           assert.equal(cfg.durable_objects.bindings.length,1);
