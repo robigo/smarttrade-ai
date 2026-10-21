@@ -73,3 +73,13 @@ test('internal ping is authenticated and does not initialize or spend budget',as
  assert.deepEqual(await authenticated.json(),{connected:true,reservationsEnabled:false});
  assert.equal(records.size,0);
 });
+
+test('internal ping remains read-only and cannot initialize the ledger',async()=>{
+ const {object,records}=makeDO();
+ const response=await object.fetch(new Request('https://budget.internal/internal/ping',{
+  method:'GET',headers:{authorization:'Bearer '+secret}
+ }));
+ assert.equal(response.status,200);
+ assert.equal((await response.json()).reservationsEnabled,false);
+ assert.equal(records.size,0);
+});
