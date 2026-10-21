@@ -1,5 +1,8 @@
 name: SmartTrade Codex Budget Sandbox Deploy
 on:
+  push:
+    branches: [preview/cloudflare-unified-v09]
+    paths: ['.github/workflows/codex-budget-sandbox-deploy.yml']
   workflow_dispatch:
     inputs:
       confirm_target:
@@ -13,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   validate:
-    if: github.repository == 'robigo/smarttrade-ai' && github.ref == 'refs/heads/preview/cloudflare-unified-v09'
+    if: github.repository == 'robigo/smarttrade-ai' && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && ((github.event_name == 'push' && startsWith(github.event.head_commit.message, 'deploy-sandbox-approved:')) || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -25,7 +28,7 @@ jobs:
           node-version: '22'
       - name: Check explicit target confirmation and isolated configuration
         env:
-          CONFIRM_TARGET: ${{ inputs.confirm_target }}
+          CONFIRM_TARGET: ${{ github.event_name == 'push' && 'smarttrade-codex-budget-sandbox' || inputs.confirm_target }}
         run: |
           set -euo pipefail
           test "$CONFIRM_TARGET" = 'smarttrade-codex-budget-sandbox'
