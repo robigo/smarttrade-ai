@@ -1,6 +1,7 @@
 // Offline reservation arithmetic only. Not a durable or cross-run spending limiter.
 // Production use requires atomic persistence, verified provider usage and fail-closed reconciliation.
-export const LIMIT_CENTS=500;
+// Conservative internal cutoff: USD 4 of the approved USD 5 monthly budget.
+export const LIMIT_CENTS=400;
 export function reserveEstimatedCost(ledger, estimateCents) {
   if (!ledger || !Number.isSafeInteger(ledger.spentCents) ||
       !Number.isSafeInteger(ledger.reservedCents) ||
