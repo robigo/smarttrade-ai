@@ -177,7 +177,7 @@ jobs:
             echo 'Agent execution requires a separately reviewed, least-privilege runner and explicit environment promotion gates.'
           } >> "$GITHUB_STEP_SUMMARY"
   monitor_summary:
-    needs: [verify, deploy, post_deploy_auth_guard, next_task_gate]
+    needs: [verify, deploy, post_deploy_auth_guard, next_task_gate, codex_connection_preflight]
     if: ${{ always() && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai' }}
     runs-on: ubuntu-latest
     permissions:
@@ -189,6 +189,7 @@ jobs:
           DEPLOY_RESULT: ${{ needs.deploy.result }}
           AUTH_RESULT: ${{ needs.post_deploy_auth_guard.result }}
           NEXT_RESULT: ${{ needs.next_task_gate.result }}
+          CODEX_PREFLIGHT_RESULT: ${{ needs.codex_connection_preflight.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
@@ -203,6 +204,7 @@ jobs:
             echo "| Preview deployment and health | $DEPLOY_RESULT |"
             echo "| Anonymous access guard | $AUTH_RESULT |"
             echo "| Next task handoff | $NEXT_RESULT |"
+            echo "| Codex credential presence preflight (no API calls) | $CODEX_PREFLIGHT_RESULT |"
             echo ''
             echo "Commit: \`$COMMIT_SHA\`"
             echo "Run: $RUN_URL"
