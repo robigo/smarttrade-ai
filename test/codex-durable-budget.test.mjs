@@ -21,12 +21,12 @@ function fakeStore(initial) {
  };
 }
 const args=i=>({month:'2026-10',requestId:'request_'+String(i).padStart(8,'0'),estimateCents:50});
-test('twenty concurrent reservations cannot exceed 500 cents',async()=>{
+test('twenty concurrent reservations cannot exceed 400 cents',async()=>{
  const storage=fakeStore([]);
  const results=await Promise.all(Array.from({length:20},(_,i)=>reserveDurably(storage,args(i))));
- assert.equal(results.filter(r=>r.allowed).length,10);
- assert.equal(results.filter(r=>!r.allowed).length,10);
- assert.equal(storage.data.get('budget:2026-10').reservedCents,500);
+ assert.equal(results.filter(r=>r.allowed).length,8);
+ assert.equal(results.filter(r=>!r.allowed).length,8);
+ assert.equal(storage.data.get('budget:2026-10').reservedCents,400);
 });
 test('duplicate request is not charged twice',async()=>{
  const storage=fakeStore([]);
