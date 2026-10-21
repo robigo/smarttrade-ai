@@ -268,3 +268,42 @@ jobs:
           assert.equal(plan.reason,'hard_spend_stop_unverified');
           console.log(JSON.stringify({stage:'codex_runner_dry_run',ready:false,reason:plan.reason,apiCallsMade:0}));
           JS
+  github_oidc_signature_probe:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify real GitHub OIDC signature and claims without printing token
+        env:
+          EXPECTED_AUDIENCE: smarttrade-codex-budget
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {verifyGitHubOidc} from './agent/github-oidc-verify.mjs';
+          const requestUrl=process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
+          const requestToken=process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+          assert.ok(requestUrl && requestToken, 'OIDC request environment unavailable');
+          const endpoint=new URL(requestUrl);
+          assert.equal(endpoint.protocol,'https:');
+          endpoint.searchParams.set('audience',process.env.EXPECTED_AUDIENCE);
+          const response=await fetch(endpoint,{
+            headers:{authorization:'Bearer '+requestToken},
+            signal:AbortSignal.timeout(10000)
+          });
+          assert.equal(response.status,200,'GitHub OIDC token request failed');
+          const payload=await response.json();
+          assert.equal(typeof payload.value,'string');
+          const verdict=await verifyGitHubOidc(payload.value,{audience:process.env.EXPECTED_AUDIENCE});
+          console.log(JSON.stringify({stage:'github_oidc_signature_probe',allowed:verdict.allowed,mode:verdict.mode??null,reason:verdict.reason??null,tokenPrinted:false,cloudflareCalls:0,codexCalls:0}));
+          assert.equal(verdict.allowed,true,'GitHub OIDC verification failed');
+          assert.equal(verdict.mode,'read_only');
+          JS
