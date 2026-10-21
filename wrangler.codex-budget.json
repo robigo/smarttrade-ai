@@ -19,5 +19,8 @@
         "CodexBudget"
       ]
     }
-  ]
+  ],
+  "vars": {
+    "CODEX_BUDGET_OIDC_AUDIENCE": "smarttrade-codex-budget"
+  }
 }
