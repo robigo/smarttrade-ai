@@ -75,3 +75,5 @@ jobs:
         run: |
           echo 'Only smarttrade-codex-budget-sandbox was targeted. No Codex API calls or budget ledger initialization occurred.' >> "$GITHUB_STEP_SUMMARY"
 # Approval remains required through codex-budget-sandbox environment.
+
+# HTTPS probe deployment remains subject to manual environment approval.
