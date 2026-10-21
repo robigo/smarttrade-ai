@@ -134,6 +134,7 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import {evaluateHandoff} from './agent/handoff-policy.mjs';
+          import {selectNextTask} from './agent/next-task.mjs';
           const event={
             repository:process.env.SOURCE_REPO,
             branch:process.env.SOURCE_REF.replace(/^refs\/heads\//,''),
@@ -152,7 +153,13 @@ jobs:
           };
           const result=evaluateHandoff(event);
           console.log(JSON.stringify({stage:'read_only_handoff',...result}));
-          if(!result.ready)process.exitCode=1;
+          if(!result.ready) {
+            process.exitCode=1;
+          } else {
+            const selection=selectNextTask(result);
+            console.log(JSON.stringify({stage:'read_only_task_selection',...selection}));
+            if(!selection.selected || selection.execution!=='disabled')process.exitCode=1;
+          }
           JS
       - name: Publish safe next development gate
         env:
