@@ -11,6 +11,8 @@ test('budget config is isolated from existing preview and production',()=>{
  assert.equal(cfg.main,'cloudflare/src/codex-budget-worker.mjs');
  assert.equal(cfg.workers_dev,false);
  assert.equal(cfg.preview_urls,false);
+ assert.equal(cfg.vars.CODEX_BUDGET_OIDC_AUDIENCE,'smarttrade-codex-budget');
+ assert.equal(Object.hasOwn(cfg.vars,'CODEX_BUDGET_INTERNAL_TOKEN'),false);
  assert.equal(cfg.durable_objects.bindings.length,1);
  assert.equal(cfg.durable_objects.bindings[0].name,'CODEX_BUDGET');
  assert.equal(cfg.durable_objects.bindings[0].class_name,'CodexBudget');
