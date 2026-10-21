@@ -116,6 +116,44 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Evaluate handoff on GitHub runner (read-only)
+        env:
+          SOURCE_REPO: ${{ github.repository }}
+          SOURCE_REF: ${{ github.ref }}
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_RUN_ID: ${{ github.run_id }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          AUTH_RESULT: ${{ needs.post_deploy_auth_guard.result }}
+        run: |
+          node --input-type=module <<'JS'
+          import {evaluateHandoff} from './agent/handoff-policy.mjs';
+          const event={
+            repository:process.env.SOURCE_REPO,
+            branch:process.env.SOURCE_REF.replace(/^refs\/heads\//,''),
+            workflow:'SmartTrade Preview Deploy',
+            sha:process.env.SOURCE_SHA,
+            runId:Number(process.env.SOURCE_RUN_ID),
+            status:'completed',
+            conclusion:'success',
+            jobs:{
+              verify:process.env.VERIFY_RESULT,
+              deploy:process.env.DEPLOY_RESULT,
+              post_deploy_auth_guard:process.env.AUTH_RESULT,
+              next_task_gate:'success'
+            },
+            iteration:0
+          };
+          const result=evaluateHandoff(event);
+          console.log(JSON.stringify({stage:'read_only_handoff',...result}));
+          if(!result.ready)process.exitCode=1;
+          JS
       - name: Publish safe next development gate
         env:
           COMMIT_SHA: ${{ github.sha }}
