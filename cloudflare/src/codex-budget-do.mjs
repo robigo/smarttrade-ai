@@ -9,11 +9,15 @@ export class CodexBudget {
     const json=(body,status)=>new Response(JSON.stringify(body),{
       status,headers:{'content-type':'application/json','cache-control':'no-store'}
     });
-    if(request.method!=='POST')return json({error:'method_not_allowed'},405);
+    const pathname=new URL(request.url).pathname;
+    if(!(request.method==='POST'&&pathname==='/reserve') &&
+       !(request.method==='GET'&&pathname==='/internal/ping'))return json({error:'method_not_allowed'},405);
     const secret=this.env?.CODEX_BUDGET_INTERNAL_TOKEN;
     if(typeof secret!=='string'||secret.length<32)return json({error:'not_configured'},503);
     const supplied=request.headers.get('authorization');
     if(supplied!==`Bearer ${secret}`)return json({error:'unauthorized'},401);
+    // Read-only connectivity check: never reads or modifies the budget ledger.
+    if(request.method==='GET')return json({connected:true,reservationsEnabled:false},200);
     let input;
     try{input=await request.json();}catch{return json({error:'invalid_json'},400);}
     if(!input||typeof input!=='object')return json({error:'invalid_request'},400);
