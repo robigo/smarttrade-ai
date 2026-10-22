@@ -77,3 +77,5 @@ jobs:
 # Approval remains required through codex-budget-sandbox environment.
 
 # HTTPS probe deployment remains subject to manual environment approval.
+
+# Storage diagnostic release requires sandbox environment review.
