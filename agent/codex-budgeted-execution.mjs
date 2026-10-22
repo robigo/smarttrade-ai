@@ -23,7 +23,7 @@ export async function executeBudgetedCodex({
     return deny('output_limit_exceeded');
   if(typeof reserve!=='function'||typeof invoke!=='function')
     return deny('durable_reservation_or_transport_unavailable');
-  if(typeof month!=='string'||!/^\\d{4}-(0[1-9]|1[0-2])$/.test(month)||
+  if(typeof month!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)||
      typeof requestId!=='string'||!/^[a-zA-Z0-9_-]{8,128}$/.test(requestId))
     return deny('invalid_request_identity');
   // Reserve against reconciled, durable provider usage BEFORE invoking the model.
