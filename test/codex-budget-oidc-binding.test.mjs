@@ -50,3 +50,22 @@ test('budget reservation route remains closed',async()=>{
  assert.equal(response.status,404);
  assert.equal(ctx.calls(),0);
 });
+
+test('authenticated diagnostic persists independently of spending ledger',async()=>{
+ const records=new Map();
+ const storage={transaction:async fn=>fn({get:async key=>records.get(key),put:async(key,value)=>{records.set(key,value);}})};
+ const object=new CodexBudget({storage},{CODEX_BUDGET_INTERNAL_TOKEN:secret});
+ const binding={idFromName:()=> 'codex-budget-sandbox-v1',get:()=>({fetch:request=>object.fetch(request)})};
+ const gateway=createBudgetGateway({verifyToken:verifier});
+ const env={CODEX_BUDGET_OIDC_AUDIENCE:audience,CODEX_BUDGET_INTERNAL_TOKEN:secret,CODEX_BUDGET:binding};
+ const url='https://budget.example.invalid/internal/budget/storage-diagnostic';
+ const request=token=>new Request(url,{method:'POST',headers:{authorization:'Bearer '+token}});
+ assert.equal((await gateway.fetch(request('forged'),env)).status,401);
+ const first=await gateway.fetch(request('signed'),env);
+ const second=await gateway.fetch(request('signed'),env);
+ assert.equal(first.status,200);
+ assert.equal(second.status,200);
+ assert.equal((await first.json()).probeSequence,1);
+ assert.equal((await second.json()).probeSequence,2);
+ assert.equal(records.size,1);
+});
