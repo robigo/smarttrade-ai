@@ -39,26 +39,23 @@ test('unreconciled ledger and storage errors fail closed',async()=>{
  assert.equal((await makeDO().object.fetch(request())).status,503);
  assert.equal((await makeDO({fail:true}).object.fetch(request())).status,503);
 });
-test('concurrent reservations cannot exceed local ledger limit',async()=>{
+test('authenticated internal reservation remains disabled even with reconciled ledger',async()=>{
+ const {object,records}=makeDO({initialized:true});
+ const response=await object.fetch(request());
+ assert.equal(response.status,503);
+ assert.deepEqual(await response.json(),{error:'budget_reservations_disabled',reservationsEnabled:false});
+ assert.deepEqual(records.get('budget:2026-10'),{spentCents:0,reservedCents:0,reconciled:true});
+ assert.equal(records.size,1);
+});
+
+test('concurrent internal reservation requests remain disabled without storage writes',async()=>{
  const {object,records}=makeDO({initialized:true});
  const responses=await Promise.all(Array.from({length:20},(_,i)=>object.fetch(request({
   ...body,requestId:'reservation_'+String(i).padStart(5,'0')
  }))));
- assert.equal(responses.filter(r=>r.status===200).length,8);
- assert.equal(responses.filter(r=>r.status===429).length,12);
- assert.equal(records.get('budget:2026-10').reservedCents,400);
- assert.equal((await object.fetch(request({...body,requestId:'reservation_00000'}))).status,503);
-});
-
-test('budget reservations persist across Durable Object instance recreation',async()=>{
- const {object,state,records}=makeDO({initialized:true});
- assert.equal((await object.fetch(request())).status,200);
- const restarted=new CodexBudget(state,{CODEX_BUDGET_INTERNAL_TOKEN:secret});
- assert.equal((await restarted.fetch(request())).status,503);
- assert.equal(records.get('budget:2026-10').reservedCents,50);
- const next=await restarted.fetch(request({...body,requestId:'reservation_00002'}));
- assert.equal(next.status,200);
- assert.equal(records.get('budget:2026-10').reservedCents,100);
+ assert.ok(responses.every(r=>r.status===503));
+ assert.deepEqual(records.get('budget:2026-10'),{spentCents:0,reservedCents:0,reconciled:true});
+ assert.equal(records.size,1);
 });
 
 test('internal ping is authenticated and does not initialize or spend budget',async()=>{
