@@ -1,7 +1,6 @@
 // Isolated Codex budget Durable Object prototype. NOT bound or deployed.
 // A private bearer secret is required even for internal service calls.
 // No ledger is initialized here: a separately verified reconciliation is mandatory.
-import {reserveDurably} from '../../agent/codex-durable-budget.mjs';
 import {checkStoragePersistence} from '../../agent/codex-storage-diagnostic.mjs';
 
 export class CodexBudget {
@@ -24,18 +23,7 @@ export class CodexBudget {
       const result=await checkStoragePersistence(this.state.storage);
       return json({storageVerified:result.ok===true,probeSequence:result.ok?result.sequence:null,reservationsEnabled:false},result.ok?200:503);
     }
-    let input;
-    try{input=await request.json();}catch{return json({error:'invalid_json'},400);}
-    if(!input||typeof input!=='object')return json({error:'invalid_request'},400);
-    // Internal prototype does not allow live API usage, funding or reconciliation.
-    // Reject missing budget initialization rather than assuming zero usage.
-    try {
-      const result=await reserveDurably({
-        transaction:fn=>this.state.storage.transaction(fn)
-      },{month:input.month,requestId:input.requestId,estimateCents:input.estimateCents});
-      return json(result,result.allowed?200:result.reason==='budget_exceeded'?429:503);
-    }catch{
-      return json({error:'storage_unavailable'},503);
-    }
+    // Fail closed even for an authenticated internal caller: no live reservations until separately approved activation.
+    return json({error:'budget_reservations_disabled',reservationsEnabled:false},503);
   }
 }
