@@ -6,3 +6,7 @@ preview_urls = false
 
 # No assets directory: deploy only the Worker script.
 # Keep TWELVE_DATA_API_KEY and SMARTTRADE_ACCESS_TOKEN as Cloudflare secrets.
+
+# Required by Cloudflare Workers Builds when running `npx wrangler preview`.
+# Does not enable Preview URLs or change the production deploy command.
+[previews]
