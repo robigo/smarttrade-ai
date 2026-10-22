@@ -22,7 +22,7 @@ export class CodexBudget {
     if(request.method==='GET')return json({connected:true,reservationsEnabled:false},200);
     if(pathname==='/internal/storage-diagnostic'){
       const result=await checkStoragePersistence(this.state.storage);
-      return json({...result,reservationsEnabled:false},result.ok?200:503);
+      return json({storageVerified:result.ok===true,probeSequence:result.ok?result.sequence:null,reservationsEnabled:false},result.ok?200:503);
     }
     let input;
     try{input=await request.json();}catch{return json({error:'invalid_json'},400);}
