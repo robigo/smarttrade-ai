@@ -34,3 +34,24 @@ test('auth routes reject unsupported methods and absent configuration',async()=>
  assert.equal(missing.status,503);
  assert.equal((await missing.json()).error,'auth_not_configured');
 });
+
+test('logout clears session cookie and redirects to same-origin preview UI',async()=>{
+ const response=await invoke('/auth/logout',{headers:{cookie:'st_session=malformed'}});
+ assert.equal(response.status,302);
+ assert.equal(response.headers.get('location'),base+'/');
+ const cookie=response.headers.get('set-cookie')||'';
+ assert.match(cookie,/st_session=;/);
+ assert.match(cookie,/Max-Age=0/);
+ assert.match(cookie,/HttpOnly/);
+ assert.match(cookie,/Secure/);
+ assert.match(cookie,/SameSite=Lax/);
+ assert.equal(response.headers.get('cache-control'),'no-store');
+});
+test('invalid or missing session fails closed on auth status',async()=>{
+ for(const headers of [{},{cookie:'st_session=forged.payload'}]){
+  const response=await invoke('/auth/me',{headers});
+  assert.equal(response.status,401);
+  assert.deepEqual(await response.json(),{authenticated:false});
+  assert.equal(response.headers.get('cache-control'),'no-store');
+ }
+});
