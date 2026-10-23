@@ -54,3 +54,23 @@ test('quota denied at exact limits with stable retry time',()=>{
  assert.equal(dayDenied.retryAfterSeconds,86340);
  assert.equal(dayDenied.counters,atDailyLimit);
 });
+
+test('quota policy rejects unsafe or noninteger timestamps and active counters',()=>{
+ for(const timestamp of [NaN,Infinity,1.5,Number.MAX_SAFE_INTEGER+1]){
+  assert.throws(()=>windowKeys(timestamp),RangeError);
+ }
+ for(const count of [NaN,Infinity,1.5,Number.MAX_SAFE_INTEGER+1]){
+  assert.throws(()=>reserveCredit({minute:0,minuteCount:count,day:0,dayCount:0},1),RangeError);
+  assert.throws(()=>reserveCredit({minute:0,minuteCount:0,day:0,dayCount:count},1),RangeError);
+ }
+});
+test('at daily quota limit, denial preserves counters and positive retry',()=>{
+ const c={minute:10,minuteCount:0,day:0,dayCount:800};
+ const snapshot=structuredClone(c);
+ const denied=reserveCredit(c,600000);
+ assert.equal(denied.allowed,false);
+ assert.equal(denied.reason,'daily_limit');
+ assert.ok(denied.retryAfterSeconds>0);
+ assert.deepEqual(denied.counters,snapshot);
+ assert.deepEqual(c,snapshot);
+});
