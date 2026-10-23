@@ -107,6 +107,16 @@ jobs:
             const body=await response.json();
             assert.equal(body.error,'unauthorized');
           }
+          const home=await fetch(base+'/',{cache:'no-store',signal:AbortSignal.timeout(8000)});
+          assert.equal(home.status,200,'Preview UI root must load');
+          assert.match(home.headers.get('content-type')||'',/text\/html/i,'Preview root must serve HTML');
+          const html=await home.text();
+          assert.match(html,/SmartTrade AI/,'Preview UI content missing');
+          const me=await fetch(base+'/auth/me',{redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(8000)});
+          assert.equal(me.status,401,'Anonymous auth status must reject');
+          assert.equal(me.headers.get('cache-control'),'no-store');
+          assert.deepEqual(await me.json(),{authenticated:false});
+          console.log('Preview UI and anonymous auth status checks passed.');
           console.log('Post-deploy anonymous-access checks passed; no quotes requested from provider.');
           JS
   next_task_gate:
