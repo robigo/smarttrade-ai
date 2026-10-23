@@ -47,6 +47,15 @@ jobs:
             assert.equal(r.headers.get('cache-control'),'no-store');
             assert.equal((await r.json()).error,'unauthorized');
           }
+          // Live, anonymous OAuth guards. Never initiate login or exchange tokens.
+          for (const path of ['/auth/me', '/auth/google/callback?state=invalid']) {
+            const response = await get(path);
+            assert.equal(response.status,401,`Expected 401 for ${path}, got ${response.status}`);
+            assert.equal(response.headers.get('cache-control'),'no-store');
+            const data = await response.json();
+            if (path === '/auth/me') assert.equal(data.authenticated,false);
+            else assert.equal(data.error,'invalid_oauth_state');
+          }
           for (const path of ['/api/trade','/api/orders','/api/broker/order']) {
             const r = await get(path);
             assert.equal(r.status,404,path);
