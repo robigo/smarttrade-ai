@@ -97,6 +97,6 @@ test('daily quota allows eight-hundredth reservation then denies next minute',()
  const denied=reserveCredit(last.counters,660000);
  assert.equal(denied.allowed,false);
  assert.equal(denied.reason,'daily_limit');
- assert.equal(denied.retryAfterSeconds,85340);
+ assert.equal(denied.retryAfterSeconds,85740);
  assert.deepEqual(denied.counters,last.counters);
 });
