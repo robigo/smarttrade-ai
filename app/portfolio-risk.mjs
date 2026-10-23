@@ -9,7 +9,7 @@ export function assessPortfolioRisk(portfolio,prices,{maxPositionPct=25,maxGross
  let invested=0;
  const positions=[];
  for(const [symbol,units] of Object.entries(portfolio.positions)){
-  if(!safe(units)||!safe(prices[symbol])||prices[symbol]===0)return invalid('missing_or_invalid_price');
+  if(!Object.hasOwn(prices,symbol)||!safe(units)||!safe(prices[symbol])||prices[symbol]===0)return invalid('missing_or_invalid_price');
   const value=units*prices[symbol];
   if(!safe(value))return invalid('amount_overflow');
   invested+=value;
