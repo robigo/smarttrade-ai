@@ -32,3 +32,21 @@ test('gateway never exposes reservation route',async()=>{
  const response=await gateway.fetch(new Request('https://budget.example.invalid/reserve',{method:'POST'}),{});
  assert.equal(response.status,404);
 });
+
+test('authenticated budget ping fails closed without binding or internal secret',async()=>{
+ const gateway=createBudgetGateway({verifyToken:async()=>({allowed:true,mode:'read_only'})});
+ const ping=new Request('https://budget.example.invalid/internal/budget/ping',{method:'POST',headers:{authorization:'Bearer test-token'}});
+ const response=await gateway.fetch(ping,{CODEX_BUDGET_OIDC_AUDIENCE:audience});
+ assert.equal(response.status,503);
+ assert.deepEqual(await response.json(),{error:'budget_binding_unavailable'});
+});
+test('budget gateway rejects a binding that claims reservations are enabled',async()=>{
+ const gateway=createBudgetGateway({verifyToken:async()=>({allowed:true,mode:'read_only'})});
+ const ping=new Request('https://budget.example.invalid/internal/budget/ping',{method:'POST',headers:{authorization:'Bearer test-token'}});
+ const env={CODEX_BUDGET_OIDC_AUDIENCE:audience,CODEX_BUDGET_INTERNAL_TOKEN:'s'.repeat(40),CODEX_BUDGET:{
+  idFromName:()=>({}),get:()=>({fetch:async()=>new Response(JSON.stringify({connected:true,reservationsEnabled:true}),{status:200})})
+ }};
+ const response=await gateway.fetch(ping,env);
+ assert.equal(response.status,503);
+ assert.deepEqual(await response.json(),{error:'budget_binding_unavailable'});
+});
