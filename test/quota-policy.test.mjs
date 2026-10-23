@@ -24,3 +24,33 @@ test('invalid time and counters rejected',()=>{
  assert.throws(()=>windowKeys(-1),RangeError);
  assert.throws(()=>reserveCredit({minute:0,minuteCount:-1,day:0,dayCount:0},0),RangeError);
 });
+
+test('minute boundary resets per-minute count but preserves daily count',()=>{
+ const c={minute:0,minuteCount:8,day:0,dayCount:8};
+ assert.equal(reserveCredit(c,59999).allowed,false);
+ const next=reserveCredit(c,60000);
+ assert.equal(next.allowed,true);
+ assert.equal(next.counters.minuteCount,1);
+ assert.equal(next.counters.dayCount,9);
+});
+test('daily boundary resets both daily and minute counters',()=>{
+ const c={minute:1439,minuteCount:8,day:0,dayCount:800};
+ const denied=reserveCredit(c,86399999);
+ assert.equal(denied.allowed,false);
+ const next=reserveCredit(c,86400000);
+ assert.equal(next.allowed,true);
+ assert.equal(next.counters.dayCount,1);
+ assert.equal(next.counters.minuteCount,1);
+});
+test('quota denied at exact limits with stable retry time',()=>{
+ const atMinuteLimit={minute:1,minuteCount:8,day:0,dayCount:8};
+ const minuteDenied=reserveCredit(atMinuteLimit,60000);
+ assert.equal(minuteDenied.reason,'minute_limit');
+ assert.equal(minuteDenied.retryAfterSeconds,60);
+ assert.equal(minuteDenied.counters,atMinuteLimit);
+ const atDailyLimit={minute:1,minuteCount:0,day:0,dayCount:800};
+ const dayDenied=reserveCredit(atDailyLimit,60000);
+ assert.equal(dayDenied.reason,'daily_limit');
+ assert.equal(dayDenied.retryAfterSeconds,86340);
+ assert.equal(dayDenied.counters,atDailyLimit);
+});
