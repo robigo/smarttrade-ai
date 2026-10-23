@@ -74,3 +74,29 @@ test('at daily quota limit, denial preserves counters and positive retry',()=>{
  assert.deepEqual(denied.counters,snapshot);
  assert.deepEqual(c,snapshot);
 });
+
+test('minute quota permits eighth request but rejects ninth without mutation',()=>{
+ let counters={};
+ for(let n=1;n<=8;n++){
+  const result=reserveCredit(counters,5000);
+  assert.equal(result.allowed,true);
+  assert.equal(result.counters.minuteCount,n);
+  counters=result.counters;
+ }
+ const original=structuredClone(counters);
+ const denied=reserveCredit(counters,5000);
+ assert.equal(denied.allowed,false);
+ assert.equal(denied.reason,'minute_limit');
+ assert.deepEqual(counters,original);
+});
+test('daily quota allows eight-hundredth reservation then denies next minute',()=>{
+ const before={minute:10,minuteCount:0,day:0,dayCount:799};
+ const last=reserveCredit(before,600000);
+ assert.equal(last.allowed,true);
+ assert.equal(last.counters.dayCount,800);
+ const denied=reserveCredit(last.counters,660000);
+ assert.equal(denied.allowed,false);
+ assert.equal(denied.reason,'daily_limit');
+ assert.equal(denied.retryAfterSeconds,85340);
+ assert.deepEqual(denied.counters,last.counters);
+});
