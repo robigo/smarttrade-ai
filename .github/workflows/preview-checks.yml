@@ -3,7 +3,7 @@ on:
   push:
     branches: [preview/cloudflare-unified-v09]
   pull_request:
-    branches: [main, preview/cloudflare-unified-v09]
+    branches: [main, preview/cloudflare-unified-v09, ci/validate-portfolio-v1-stack]
   workflow_dispatch:
 permissions:
   contents: read
