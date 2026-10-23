@@ -35,3 +35,22 @@ test('health endpoint does not require authentication or access market provider'
   assert.equal(data.status,'ok');
   assert.equal(data.service,'smarttrade-ai-preview');
 });
+
+test('forged session cookie cannot authorize market access',async()=>{
+  const headers={cookie:'st_session=forged.payload'};
+  for(const path of ['/api/market/status','/api/market/quote?symbol=MSFT']){
+    const response=await preview.fetch(new Request(origin+path,{headers}),{
+      ...env,GOOGLE_CLIENT_ID:'test-client',GOOGLE_CLIENT_SECRET:'test-secret',
+      GOOGLE_SESSION_SECRET:'s'.repeat(40),GOOGLE_ALLOWED_EMAIL:'tester@example.invalid'
+    });
+    assert.equal(response.status,401,path);
+    assert.equal((await response.json()).error,'unauthorized');
+  }
+});
+test('unsupported methods never reach asset or market provider',async()=>{
+  for(const method of ['PUT','DELETE']){
+    const response=await preview.fetch(new Request(origin+'/api/market/quote?symbol=SPY',{method}),env);
+    assert.equal(response.status,405);
+    assert.equal((await response.json()).error,'method_not_allowed');
+  }
+});
