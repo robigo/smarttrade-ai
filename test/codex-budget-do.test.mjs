@@ -80,3 +80,28 @@ test('internal ping remains read-only and cannot initialize the ledger',async()=
  assert.equal((await response.json()).reservationsEnabled,false);
  assert.equal(records.size,0);
 });
+
+test('disabled reservations do not access budget storage',async()=>{
+ let reads=0,writes=0;
+ const state={storage:{
+  get:async()=>{reads++;throw Error('unexpected read');},
+  put:async()=>{writes++;throw Error('unexpected write');},
+  transaction:async()=>{writes++;throw Error('unexpected transaction');}
+ }};
+ const object=new CodexBudget(state,{CODEX_BUDGET_INTERNAL_TOKEN:secret});
+ const response=await object.fetch(request());
+ assert.equal(response.status,503);
+ assert.deepEqual(await response.json(),{error:'budget_reservations_disabled',reservationsEnabled:false});
+ assert.equal(reads,0);
+ assert.equal(writes,0);
+});
+test('unknown budget routes and unsupported methods remain unavailable',async()=>{
+ const {object,records}=makeDO({initialized:true});
+ for(const [path,method] of [['/internal/unknown','GET'],['/reserve','GET'],['/internal/ping','POST']]){
+  const response=await object.fetch(new Request('https://budget.internal'+path,{
+   method,headers:{authorization:'Bearer '+secret}
+  }));
+  assert.equal(response.status,405,path);
+ }
+ assert.equal(records.size,1);
+});
