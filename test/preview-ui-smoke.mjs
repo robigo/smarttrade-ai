@@ -44,6 +44,22 @@ try {
   assert.match(await page.locator('#msg').innerText(), /אין מספיק יחידות/);
   assert.equal(await page.locator('#history tr').count(), 2);
 
+  // Same-origin auth navigation must not reference an undefined AUTH_BASE.
+  await page.route('**/auth/google/start', route => route.fulfill({
+    status: 200, contentType: 'text/html', body: '<title>Mock Google auth start</title>'
+  }));
+  await page.locator('#googleLogin').click();
+  await page.waitForURL('**/auth/google/start');
+  assert.equal(new URL(page.url()).origin, 'http://127.0.0.1:8765');
+  await page.goto('http://127.0.0.1:8765/', { waitUntil: 'domcontentloaded' });
+  await page.route('**/health', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ status: 'ok', service: 'smarttrade-ai-preview' })
+  }));
+  await page.locator('#checkGateway').click();
+  await assert.doesNotReject(() => page.locator('#gatewayState').getByText('שרת הנתונים פעיל', { exact: false }).waitFor());
+  await page.unrouteAll();
+  
   assert.deepEqual(errors, [], 'Unexpected browser errors');
   console.log('Preview UI smoke tests passed (local static assets; no real trades).');
 } finally {
