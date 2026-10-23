@@ -55,3 +55,24 @@ test('invalid or missing session fails closed on auth status',async()=>{
   assert.equal(response.headers.get('cache-control'),'no-store');
  }
 });
+
+test('OAuth start uses PKCE, nonce, state, and secure transaction cookie',async()=>{
+ const response=await invoke('/auth/google/start');
+ assert.equal(response.status,302);
+ const target=new URL(response.headers.get('location'));
+ assert.equal(target.origin,'https://accounts.google.com');
+ assert.equal(target.searchParams.get('redirect_uri'),base+'/auth/google/callback');
+ assert.equal(target.searchParams.get('response_type'),'code');
+ assert.equal(target.searchParams.get('code_challenge_method'),'S256');
+ for(const key of ['state','nonce','code_challenge']){
+  assert.ok((target.searchParams.get(key)||'').length>=32,key);
+ }
+ assert.equal(target.searchParams.get('scope'),'openid email profile');
+ const cookie=response.headers.get('set-cookie')||'';
+ assert.match(cookie,/st_oauth=/);
+ assert.match(cookie,/HttpOnly/);
+ assert.match(cookie,/Secure/);
+ assert.match(cookie,/SameSite=Lax/);
+ assert.match(cookie,/Max-Age=300/);
+ assert.equal(response.headers.get('cache-control'),'no-store');
+});
