@@ -22,13 +22,15 @@ export default {
       if(env.MARKET_QUOTA_GUARD_READY!=='true')return json({error:'quota_guard_not_ready'},503);
       if(!env.TWELVE_DATA_API_KEY)return json({error:'provider_not_configured'},503);
       if(!env.MARKET_QUOTA)return json({error:'quota_guard_unavailable'},503);
-      // Edge cache is only an optimization, not a distributed quota guard.
-      const cache=caches.default;
-      const cachedKey=new Request('https://smarttrade-preview-cache.invalid/quote/'+encodeURIComponent(url.searchParams.get('symbol')||''));
-      const cached=await cache.match(cachedKey);
-      if(cached)return cached;
+      // Validate symbols before any cache access; unsupported requests must never
+      // reach cached provider data or consume provider credits.
       const symbol=url.searchParams.get('symbol');
       if(!['AAPL','MSFT','SPY'].includes(symbol))return json({error:'unsupported_symbol'},400);
+      // Edge cache is only an optimization, not a distributed quota guard.
+      const cache=caches.default;
+      const cachedKey=new Request('https://smarttrade-preview-cache.invalid/quote/'+encodeURIComponent(symbol));
+      const cached=await cache.match(cachedKey);
+      if(cached)return cached;
       try{
         // Reserve before calling provider; conservative counting includes failed upstream calls.
         const quotaObject=env.MARKET_QUOTA.get(env.MARKET_QUOTA.idFromName('twelvedata-basic8-preview'));
