@@ -11,7 +11,7 @@ async function unseal(secret,value){if(!value||!value.includes('.'))return null;
 function getCookie(req,name){return (req.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(name+'='))?.slice(name.length+1)}
 function ready(env){return !!(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&env.GOOGLE_SESSION_SECRET?.length>=32&&env.GOOGLE_ALLOWED_EMAIL)}
 const redirectUri='https://smarttrade-ai-preview.goshen-r.workers.dev/auth/google/callback';
-const home='https://smarttrade-ai-preview.goshen-r.workers.dev/';
+const home='https://robigo.github.io/smarttrade-ai/';
 async function verifyIdToken(jwt,clientId,nonce){
   const parts=jwt.split('.');if(parts.length!==3)throw Error('token');
   const header=JSON.parse(new TextDecoder().decode(from64(parts[0])));
