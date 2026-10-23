@@ -76,3 +76,13 @@ test('OAuth start uses PKCE, nonce, state, and secure transaction cookie',async(
  assert.match(cookie,/Max-Age=300/);
  assert.equal(response.headers.get('cache-control'),'no-store');
 });
+
+test('OAuth transaction cookie is host-scoped and excludes browser-readable attributes',async()=>{
+ const response=await invoke('/auth/google/start');
+ const cookie=response.headers.get('set-cookie')||'';
+ assert.match(cookie,/Path=\//);
+ assert.doesNotMatch(cookie,/(?:^|;)\s*Domain=/i);
+ assert.doesNotMatch(cookie,/(?:^|;)\s*SameSite=None/i);
+ assert.doesNotMatch(cookie,/(?:^|;)\s*Max-Age=0/i);
+ assert.equal(response.headers.get('cache-control'),'no-store');
+});
