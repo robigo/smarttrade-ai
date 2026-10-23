@@ -3,7 +3,7 @@ on:
   push:
     branches: [preview/cloudflare-unified-v09]
   pull_request:
-    branches: [main]
+    branches: [main, preview/cloudflare-unified-v09]
   workflow_dispatch:
 permissions:
   contents: read
