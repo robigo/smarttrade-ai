@@ -50,3 +50,23 @@ test('budget gateway rejects a binding that claims reservations are enabled',asy
  assert.equal(response.status,503);
  assert.deepEqual(await response.json(),{error:'budget_binding_unavailable'});
 });
+
+test('all internal budget endpoints reject unauthenticated callers',async()=>{
+ const gateway=createBudgetGateway({verifyToken:async()=>({allowed:true,mode:'read_only'})});
+ for(const path of ['/internal/auth-check','/internal/budget/ping','/internal/budget/storage-diagnostic']){
+  const request=new Request('https://budget.example.invalid'+path,{method:'POST'});
+  const response=await gateway.fetch(request,{CODEX_BUDGET_OIDC_AUDIENCE:audience});
+  assert.equal(response.status,401,path);
+  assert.equal(response.headers.get('cache-control'),'no-store');
+  assert.equal((await response.json()).error,'unauthorized');
+ }
+});
+test('all internal budget endpoints reject write-mode authorization',async()=>{
+ const gateway=createBudgetGateway({verifyToken:async()=>({allowed:true,mode:'write'})});
+ for(const path of ['/internal/auth-check','/internal/budget/ping','/internal/budget/storage-diagnostic']){
+  const request=new Request('https://budget.example.invalid'+path,{method:'POST',headers:{authorization:'Bearer dummy'}});
+  const response=await gateway.fetch(request,{CODEX_BUDGET_OIDC_AUDIENCE:audience});
+  assert.equal(response.status,401,path);
+  assert.equal((await response.json()).error,'unauthorized');
+ }
+});
