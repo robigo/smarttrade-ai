@@ -70,3 +70,22 @@ test('all internal budget endpoints reject write-mode authorization',async()=>{
   assert.equal((await response.json()).error,'unauthorized');
  }
 });
+
+test('storage diagnostic rejects invalid proof and never enables reservations',async()=>{
+ const gateway=createBudgetGateway({verifyToken:async()=>({allowed:true,mode:'read_only'})});
+ const request=new Request('https://budget.example.invalid/internal/budget/storage-diagnostic',{
+  method:'POST',headers:{authorization:'Bearer test-token'}
+ });
+ for(const proof of [
+  {storageVerified:false,probeSequence:1,reservationsEnabled:false},
+  {storageVerified:true,probeSequence:0,reservationsEnabled:false},
+  {storageVerified:true,probeSequence:1,reservationsEnabled:true}
+ ]){
+  const env={CODEX_BUDGET_OIDC_AUDIENCE:audience,CODEX_BUDGET_INTERNAL_TOKEN:'s'.repeat(40),CODEX_BUDGET:{
+   idFromName:()=>({}),get:()=>({fetch:async()=>new Response(JSON.stringify(proof),{status:200})})
+  }};
+  const response=await gateway.fetch(request,env);
+  assert.equal(response.status,503);
+  assert.deepEqual(await response.json(),{error:'budget_binding_unavailable'});
+ }
+});
