@@ -1,0 +1,37 @@
+name: SmartTrade Preview Five-Minute Watch
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: smarttrade-preview-five-minute-watch
+  cancel-in-progress: false
+jobs:
+  preview-health:
+    if: github.repository == 'robigo/smarttrade-ai'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check public Preview health without deployment
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          const url='https://smarttrade-ai-preview.goshen-r.workers.dev/health';
+          let last='unknown';
+          for(let attempt=1;attempt<=3;attempt++){
+            try{
+              const response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(8000)});
+              const data=await response.json();
+              if(response.ok&&data.status==='ok'&&data.service==='smarttrade-ai-preview'&&data.mode==='auth-preview'){
+                console.log('Preview health PASS on attempt '+attempt);
+                process.exit(0);
+              }
+              last='unexpected response HTTP '+response.status;
+            }catch(error){last=error.name||'network error'}
+            if(attempt<3)await new Promise(resolve=>setTimeout(resolve,3000));
+          }
+          console.error('Preview health FAIL: '+last);
+          process.exit(1);
+          JS
