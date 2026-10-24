@@ -1,0 +1,66 @@
+name: SmartTrade Live Preview Acceptance (read only)
+on:
+  push:
+    branches:
+      - test/live-preview-acceptance-20261022
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: smarttrade-live-preview-acceptance
+  cancel-in-progress: false
+jobs:
+  live-preview-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify public preview and fail-closed endpoints without paid calls
+        env:
+          PREVIEW_BASE: https://smarttrade-ai-preview.goshen-r.workers.dev
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const base = process.env.PREVIEW_BASE;
+          const get = (path) => fetch(base + path, {
+            redirect:'manual', cache:'no-store',
+            signal:AbortSignal.timeout(8000)
+          });
+          const health = await get('/health');
+          assert.equal(health.status,200);
+          assert.equal(health.headers.get('cache-control'),'no-store');
+          const info = await health.json();
+          assert.equal(info.status,'ok');
+          assert.equal(info.service,'smarttrade-ai-preview');
+          const ui = await get('/');
+          assert.equal(ui.status,200);
+          const html = await ui.text();
+          assert.match(html,/SmartTrade AI/);
+          for (const path of ['/api/market/status','/api/market/quote?symbol=AAPL']) {
+            const r = await get(path);
+            assert.equal(r.status,401,path);
+            assert.equal(r.headers.get('cache-control'),'no-store');
+            assert.equal((await r.json()).error,'unauthorized');
+          }
+          // Live, anonymous OAuth guards. Never initiate login or exchange tokens.
+          for (const path of ['/auth/me', '/auth/google/callback?state=invalid']) {
+            const response = await get(path);
+            assert.equal(response.status,401,`Expected 401 for ${path}, got ${response.status}`);
+            assert.equal(response.headers.get('cache-control'),'no-store');
+            const data = await response.json();
+            if (path === '/auth/me') assert.equal(data.authenticated,false);
+            else assert.equal(data.error,'invalid_oauth_state');
+          }
+          for (const path of ['/api/trade','/api/orders','/api/broker/order']) {
+            const r = await get(path);
+            assert.equal(r.status,404,path);
+            assert.equal((await r.json()).error,'preview_endpoint_disabled');
+          }
+          console.log('PASS: live Preview UI, health, anonymous auth guard, disabled trading endpoints.');
+          console.log('No credentials, provider quotes, paid APIs, state changes, or real trades.');
+          JS
