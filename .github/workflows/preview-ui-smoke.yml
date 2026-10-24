@@ -51,3 +51,9 @@ jobs:
         run: node --test test/ci-result-controller.test.mjs
       - name: Generate pre-production blocker report
         run: node scripts/production-readiness.mjs
+      - name: Upload readiness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: smarttrade-preproduction-readiness
+          path: production-readiness-report.json
+          retention-days: 30
