@@ -37,8 +37,18 @@ jobs:
           exit 1
       - name: Run paper-trading browser smoke tests
         run: node test/preview-ui-smoke.mjs
+  deployed-security-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify deployed Preview API access controls
+        run: node --test test/preview-public-security.test.mjs
   readiness-report:
-    needs: browser-smoke
+    needs: [browser-smoke, deployed-security-smoke]
     if: github.ref == 'refs/heads/preview/cloudflare-unified-v09' || github.ref == 'refs/heads/test/ci-result-controller-20261020'
     runs-on: ubuntu-latest
     timeout-minutes: 4
