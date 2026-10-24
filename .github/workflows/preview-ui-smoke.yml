@@ -47,6 +47,8 @@ jobs:
           node-version: '22'
       - name: Verify deployed Preview API access controls
         run: node --test test/preview-public-security.test.mjs
+      - name: Verify bounded read-only resilience
+        run: node --test test/preview-readonly-resilience.test.mjs
   readiness-report:
     needs: [browser-smoke, deployed-security-smoke]
     if: github.ref == 'refs/heads/preview/cloudflare-unified-v09' || github.ref == 'refs/heads/test/ci-result-controller-20261020'
