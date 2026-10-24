@@ -51,6 +51,8 @@ jobs:
         run: node --test test/ci-result-controller.test.mjs
       - name: Generate pre-production blocker report
         run: node scripts/production-readiness.mjs
+      - name: Verify readiness evidence and approval gate
+        run: node --test test/production-readiness-report.test.mjs
       - name: Upload readiness evidence
         uses: actions/upload-artifact@v4
         with:
