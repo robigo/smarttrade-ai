@@ -1,5 +1,4 @@
-import {readFileSync, appendFileSync} from 'node:fs';
-import {execFileSync} from 'node:child_process';
+import {readFileSync, appendFileSync, writeFileSync} from 'node:fs';
 
 const checks=[];
 function record(name,passed,details=''){checks.push({name,passed,details});}
@@ -22,7 +21,10 @@ const missing=[
   'Operational rollback, incident response, and approval evidence',
   'Explicit production deployment approval'
 ];
-const report=['# SmartTrade pre-production readiness gate','',...checks.map(x=>'- '+(x.passed?'PASS':'FAIL')+' '+x.name),'','## Required before production',...missing.map(x=>'- BLOCKED: '+x),'','**Decision: NOT PRODUCTION READY. No deployment or secrets changes.**',''];
+const decision={productionReady:checks.every(x=>x.passed)&&missing.length===0,checks,blockers:missing,generatedAt:new Date().toISOString()};
+writeFileSync('production-readiness-report.json',JSON.stringify(decision,null,2)+'\n');
+if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,'production_ready='+decision.productionReady+'\n');
+const report=['# SmartTrade pre-production readiness gate','',...checks.map(x=>'- '+(x.passed?'PASS':'FAIL')+' '+x.name),'','## Required before production',...missing.map(x=>'- BLOCKED: '+x),'','**Decision: '+(decision.productionReady?'READY FOR HUMAN APPROVAL':'NOT PRODUCTION READY')+'. No deployment or secrets changes.**',''];
 const output=report.join('\n');
 if(process.env.GITHUB_STEP_SUMMARY)appendFileSync(process.env.GITHUB_STEP_SUMMARY,output);
 console.log(output);
