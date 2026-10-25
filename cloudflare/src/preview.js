@@ -1,11 +1,13 @@
 export {MarketQuota} from './market-quota-do.mjs';
 import {handleAuth,getAuthorizedSession} from './auth.js';
+import {handlePrivatePortfolio} from './private-portfolio.mjs';
 // Isolated same-origin authentication preview. Market data remains disabled until durable quota enforcement is deployed.
 export default {
   async fetch(request,env) {
     const url=new URL(request.url);
     if(url.pathname==='/health') return new Response(JSON.stringify({status:'ok',service:'smarttrade-ai-preview',mode:'auth-preview'}),{headers:{'content-type':'application/json','cache-control':'no-store'}});
     if(url.pathname.startsWith('/auth/')) return handleAuth(request,env,url);
+    if(url.pathname==='/api/private/portfolio')return handlePrivatePortfolio(request,env,url);
     if(url.pathname==='/api/market/status'){
       if(request.method!=='GET')return new Response(JSON.stringify({error:'method_not_allowed'}),{status:405,headers:{'content-type':'application/json','cache-control':'no-store'}});
       const session=await getAuthorizedSession(request,env);
