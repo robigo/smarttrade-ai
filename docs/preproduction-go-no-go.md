@@ -8,7 +8,7 @@
 - [x] Bounded read-only API resilience check.
 - [x] Machine-readable readiness report uploaded as GitHub Actions artifact.
 - [x] Preview Health check and CI decision tests.
-- [ ] PR #2 merged to Preview and deployment verified against the merge SHA.
+- [x] PR #2 merged to Preview; Preview deployment verified.
 - [ ] Event-driven result controller demonstrated from an actual completed upstream workflow (workflow_run must exist on default branch).
 - [ ] All critical tests run against deployed Preview, not only local assets.
 
@@ -34,3 +34,9 @@
 4. Only after human UAT and separate explicit production approval may a production change be considered.
 
 **No automatic production deployment is authorized by this document.**
+
+## Verified evidence (2026-10-25)
+- SHA `9d82b3f`: Preview Checks, UI Smoke and Preview Deploy succeeded in GitHub Actions.
+- Full Google account login and non-production rollback rehearsal remain unverified.
+- Cloudflare Production build failures require independent log review.
+- Decision: NO-GO until these blockers and human UAT are closed.
