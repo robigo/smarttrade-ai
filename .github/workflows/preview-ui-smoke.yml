@@ -1,0 +1,78 @@
+name: SmartTrade Preview UI Smoke Tests
+on:
+  push:
+    branches:
+      - preview/cloudflare-unified-v09
+      - test/preview-ui-smoke-20261020
+      - test/ci-result-controller-20261020
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Cache Playwright browser binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-1.56.1-${{ runner.os }}
+      - name: Install isolated browser test dependency
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Start local-only preview asset server
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory preview-public > /tmp/smarttrade-ui-server.log 2>&1 &
+          echo $! > /tmp/smarttrade-ui-server.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --output /dev/null http://127.0.0.1:8765/; then
+              echo 'Local preview server is ready'
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/smarttrade-ui-server.log
+          echo 'Local preview server did not become ready'
+          exit 1
+      - name: Run paper-trading browser smoke tests
+        run: node test/preview-ui-smoke.mjs
+  deployed-security-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify deployed Preview API access controls
+        run: node --test test/preview-public-security.test.mjs
+      - name: Verify bounded read-only resilience
+        run: node --test test/preview-readonly-resilience.test.mjs
+  readiness-report:
+    needs: [browser-smoke, deployed-security-smoke]
+    if: github.ref == 'refs/heads/preview/cloudflare-unified-v09' || github.ref == 'refs/heads/test/ci-result-controller-20261020'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify decision rules
+        run: node --test test/ci-result-controller.test.mjs
+      - name: Generate pre-production blocker report
+        run: node scripts/production-readiness.mjs
+      - name: Verify readiness evidence and approval gate
+        run: node --test test/production-readiness-report.test.mjs
+      - name: Upload readiness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: smarttrade-preproduction-readiness
+          path: production-readiness-report.json
+          retention-days: 30

@@ -1,0 +1,26 @@
+{
+  "name": "smarttrade-codex-budget-sandbox",
+  "main": "cloudflare/src/codex-budget-worker.mjs",
+  "compatibility_date": "2026-10-19",
+  "workers_dev": true,
+  "preview_urls": false,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CODEX_BUDGET",
+        "class_name": "CodexBudget"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1_codex_budget",
+      "new_sqlite_classes": [
+        "CodexBudget"
+      ]
+    }
+  ],
+  "vars": {
+    "CODEX_BUDGET_OIDC_AUDIENCE": "smarttrade-codex-budget"
+  }
+}

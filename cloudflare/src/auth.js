@@ -10,8 +10,8 @@ async function seal(secret,obj){const data=b64u(te.encode(JSON.stringify(obj)));
 async function unseal(secret,value){if(!value||!value.includes('.'))return null;const [data,sig]=value.split('.');if(!data||!sig||await mac(secret,data)!==sig)return null;try{return JSON.parse(new TextDecoder().decode(from64(data)))}catch{return null}}
 function getCookie(req,name){return (req.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(name+'='))?.slice(name.length+1)}
 function ready(env){return !!(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&env.GOOGLE_SESSION_SECRET?.length>=32&&env.GOOGLE_ALLOWED_EMAIL)}
-const redirectUri='https://smarttrade-ai.goshen-r.workers.dev/auth/google/callback';
-const home='https://robigo.github.io/smarttrade-ai/';
+const redirectUri='https://smarttrade-ai-preview.goshen-r.workers.dev/auth/google/callback';
+const home='https://smarttrade-ai-preview.goshen-r.workers.dev/';
 async function verifyIdToken(jwt,clientId,nonce){
   const parts=jwt.split('.');if(parts.length!==3)throw Error('token');
   const header=JSON.parse(new TextDecoder().decode(from64(parts[0])));
@@ -60,7 +60,7 @@ export async function handleAuth(req,env,url){
       stage='session_creation';
       const session=await seal(env.GOOGLE_SESSION_SECRET,{sub:p.sub,email:p.email,exp:Date.now()+3600000});
       headers.append('set-cookie',cookie('st_session',session,3600));
-      headers.set('location','/auth/me');
+      headers.set('location',home);
       return new Response(null,{status:302,headers});
     }catch{console.warn('SMARTTRADE_GOOGLE_AUTH_STAGE',stage);return json({error:'google_auth_failed'},401,Object.fromEntries(headers))}
   }
@@ -71,4 +71,13 @@ export async function handleAuth(req,env,url){
     return json({authenticated:true,email:session.email});
   }
   return json({error:'not_found'},404);
+}
+
+// Shared server-side session validation for protected preview routes.
+export async function getAuthorizedSession(req,env){
+  if(!ready(env))return null;
+  const session=await unseal(env.GOOGLE_SESSION_SECRET,getCookie(req,'st_session'));
+  if(!session||typeof session.exp!=='number'||session.exp<=Date.now()||typeof session.sub!=='string'||!session.sub||typeof session.email!=='string')return null;
+  if(session.email.toLowerCase()!==env.GOOGLE_ALLOWED_EMAIL.trim().toLowerCase())return null;
+  return {sub:session.sub};
 }

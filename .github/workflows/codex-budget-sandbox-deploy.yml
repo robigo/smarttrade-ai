@@ -1,0 +1,81 @@
+name: SmartTrade Codex Budget Sandbox Deploy
+on:
+  push:
+    branches: [preview/cloudflare-unified-v09]
+    paths: ['.github/workflows/codex-budget-sandbox-deploy.yml']
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: 'Type smarttrade-codex-budget-sandbox to permit isolated deployment'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: smarttrade-codex-budget-sandbox-deploy
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: github.repository == 'robigo/smarttrade-ai' && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && ((github.event_name == 'push' && startsWith(github.event.head_commit.message, 'deploy-sandbox-approved:')) || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check explicit target confirmation and isolated configuration
+        env:
+          CONFIRM_TARGET: ${{ github.event_name == 'push' && 'smarttrade-codex-budget-sandbox' || inputs.confirm_target }}
+        run: |
+          set -euo pipefail
+          test "$CONFIRM_TARGET" = 'smarttrade-codex-budget-sandbox'
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          const cfg=JSON.parse(fs.readFileSync('wrangler.codex-budget.json','utf8'));
+          assert.equal(cfg.name,'smarttrade-codex-budget-sandbox');
+          assert.equal(cfg.main,'cloudflare/src/codex-budget-worker.mjs');
+          assert.equal(cfg.workers_dev,true);
+          assert.equal(cfg.preview_urls,false);
+          assert.equal(cfg.vars.CODEX_BUDGET_OIDC_AUDIENCE,'smarttrade-codex-budget');
+          assert.equal(cfg.durable_objects.bindings.length,1);
+          assert.equal(cfg.durable_objects.bindings[0].name,'CODEX_BUDGET');
+          assert.deepEqual(cfg.migrations[0].new_sqlite_classes,['CodexBudget']);
+          assert.equal(Object.hasOwn(cfg.vars,'CODEX_BUDGET_INTERNAL_TOKEN'),false);
+          JS
+          node --test test/codex-*.test.mjs
+          npx --yes wrangler@4.151.2 deploy --dry-run --config wrangler.codex-budget.json --outdir /tmp/codex-budget-build
+  deploy:
+    needs: validate
+    if: github.repository == 'robigo/smarttrade-ai' && github.ref == 'refs/heads/preview/cloudflare-unified-v09'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: codex-budget-sandbox
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Deploy isolated budget Worker only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test "$GITHUB_REF" = 'refs/heads/preview/cloudflare-unified-v09'
+          npx --yes wrangler@4.151.2 deploy --config wrangler.codex-budget.json
+      - name: Record scope
+        run: |
+          echo 'Only smarttrade-codex-budget-sandbox was targeted. No Codex API calls or budget ledger initialization occurred.' >> "$GITHUB_STEP_SUMMARY"
+# Approval remains required through codex-budget-sandbox environment.
+
+# HTTPS probe deployment remains subject to manual environment approval.
+
+# Storage diagnostic release requires sandbox environment review.

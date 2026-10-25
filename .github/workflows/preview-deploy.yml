@@ -1,0 +1,365 @@
+name: SmartTrade Preview Deploy
+on:
+  push:
+    branches:
+      - preview/cloudflare-unified-v09
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: smarttrade-preview-deploy
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate preview code and target
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check cloudflare/src/auth.js
+          node --check cloudflare/src/preview.js
+          node --test test/*.test.mjs
+          node --check cloudflare/src/market-quota-do.mjs
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          const cfg=JSON.parse(fs.readFileSync('wrangler.preview.json','utf8'));
+          assert.equal(cfg.name,'smarttrade-ai-preview');
+          assert.equal(cfg.main,'cloudflare/src/preview.js');
+          assert.equal(cfg.workers_dev,true);
+          assert.equal(cfg.assets.directory,'./preview-public');
+          assert.equal(cfg.durable_objects.bindings[0].name,'MARKET_QUOTA');
+          assert.equal(cfg.migrations[0].new_sqlite_classes[0],'MarketQuota');
+          assert.equal(cfg.assets.binding,'ASSETS');
+          assert.equal(cfg.assets.run_worker_first,true);
+          assert.match(fs.readFileSync('preview-public/index.html','utf8'),/SmartTrade AI/);
+          JS
+  deploy:
+    needs: verify
+    if: github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Deploy isolated Cloudflare preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          # Normalize copy/paste artifacts without logging the account identifier.
+          CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '\\r\\n\\t ' | tr -d '"')"
+          export CLOUDFLARE_ACCOUNT_ID
+          if ! [[ "$CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9a-fA-F]{32}$ ]]; then
+            echo "::error::Cloudflare Account ID must be exactly 32 hexadecimal characters (after normalization)."
+            exit 1
+          fi
+          npx --yes wrangler@4.151.2 deploy --config wrangler.preview.json
+      - name: Check preview health
+        run: |
+          node --input-type=module <<'JS'
+          const url='https://smarttrade-ai-preview.goshen-r.workers.dev/health';
+          let ok=false;
+          for(let attempt=0;attempt<5;attempt++){
+            try {
+              const r=await fetch(url,{signal:AbortSignal.timeout(8000),cache:'no-store'});
+              const d=await r.json();
+              if(r.ok&&d.status==='ok'&&d.service==='smarttrade-ai-preview'){ok=true;break}
+            } catch {}
+            await new Promise(resolve=>setTimeout(resolve,3000));
+          }
+          if(!ok)throw Error('Preview health check failed');
+          console.log('Preview health check passed');
+          JS
+  post_deploy_auth_guard:
+    needs: deploy
+    if: github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify deployed Preview rejects anonymous market requests
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const base='https://smarttrade-ai-preview.goshen-r.workers.dev';
+          for (const path of ['/api/market/status','/api/market/quote?symbol=AAPL']) {
+            const response=await fetch(base+path,{
+              headers:{accept:'application/json'},
+              redirect:'manual',
+              cache:'no-store',
+              signal:AbortSignal.timeout(8000)
+            });
+            assert.equal(response.status,401,`Expected 401 for ${path}, got ${response.status}`);
+            assert.equal(response.headers.get('cache-control'),'no-store');
+            const body=await response.json();
+            assert.equal(body.error,'unauthorized');
+          }
+          const home=await fetch(base+'/',{cache:'no-store',signal:AbortSignal.timeout(8000)});
+          assert.equal(home.status,200,'Preview UI root must load');
+          assert.match(home.headers.get('content-type')||'',/text\/html/i,'Preview root must serve HTML');
+          const html=await home.text();
+          assert.match(html,/SmartTrade AI/,'Preview UI content missing');
+          const me=await fetch(base+'/auth/me',{redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(8000)});
+          assert.equal(me.status,401,'Anonymous auth status must reject');
+          assert.equal(me.headers.get('cache-control'),'no-store');
+          assert.deepEqual(await me.json(),{authenticated:false});
+          console.log('Preview UI and anonymous auth status checks passed.');
+          console.log('Post-deploy anonymous-access checks passed; no quotes requested from provider.');
+          JS
+  next_task_gate:
+    needs: [verify, deploy, post_deploy_auth_guard]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai' && needs.verify.result == 'success' && needs.deploy.result == 'success' && needs.post_deploy_auth_guard.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Evaluate handoff on GitHub runner (read-only)
+        env:
+          SOURCE_REPO: ${{ github.repository }}
+          SOURCE_REF: ${{ github.ref }}
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_RUN_ID: ${{ github.run_id }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          AUTH_RESULT: ${{ needs.post_deploy_auth_guard.result }}
+        run: |
+          node --input-type=module <<'JS'
+          import {evaluateHandoff} from './agent/handoff-policy.mjs';
+          import {selectNextTask} from './agent/next-task.mjs';
+          const event={
+            repository:process.env.SOURCE_REPO,
+            branch:process.env.SOURCE_REF.replace(/^refs\/heads\//,''),
+            workflow:'SmartTrade Preview Deploy',
+            sha:process.env.SOURCE_SHA,
+            runId:Number(process.env.SOURCE_RUN_ID),
+            status:'completed',
+            conclusion:'success',
+            jobs:{
+              verify:process.env.VERIFY_RESULT,
+              deploy:process.env.DEPLOY_RESULT,
+              post_deploy_auth_guard:process.env.AUTH_RESULT,
+              next_task_gate:'success'
+            },
+            iteration:0
+          };
+          const result=evaluateHandoff(event);
+          console.log(JSON.stringify({stage:'read_only_handoff',...result}));
+          if(!result.ready) {
+            process.exitCode=1;
+          } else {
+            const selection=selectNextTask(result);
+            console.log(JSON.stringify({stage:'read_only_task_selection',...selection}));
+            if(!selection.selected || selection.execution!=='disabled')process.exitCode=1;
+          }
+          JS
+      - name: Publish safe next development gate
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo '## Preview checks passed — next development gate'
+            echo ''
+            echo "Verified commit: \`$COMMIT_SHA\`"
+            echo ''
+            echo 'Next candidate: add isolated regression tests for cache misses, invalid symbols and quota-denied responses.'
+            echo ''
+            echo 'Status: READY FOR AGENT PICKUP, NOT EXECUTED.'
+            echo 'This job has read-only permissions. It does not run an AI agent, create commits, enable quotes, or promote to staging/production.'
+            echo 'Agent execution requires a separately reviewed, least-privilege runner and explicit environment promotion gates.'
+          } >> "$GITHUB_STEP_SUMMARY"
+  monitor_summary:
+    needs: [verify, deploy, post_deploy_auth_guard, next_task_gate, codex_connection_preflight]
+    if: ${{ always() && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Publish timestamped execution status
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          AUTH_RESULT: ${{ needs.post_deploy_auth_guard.result }}
+          NEXT_RESULT: ${{ needs.next_task_gate.result }}
+          CODEX_PREFLIGHT_RESULT: ${{ needs.codex_connection_preflight.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo '## SmartTrade Preview — execution monitor'
+            echo ''
+            echo "Updated (UTC): $(date -u +'%Y-%m-%d %H:%M:%S')"
+            echo ''
+            echo "| Stage | Result |"
+            echo "| --- | --- |"
+            echo "| Regression tests | $VERIFY_RESULT |"
+            echo "| Preview deployment and health | $DEPLOY_RESULT |"
+            echo "| Anonymous access guard | $AUTH_RESULT |"
+            echo "| Next task handoff | $NEXT_RESULT |"
+            echo "| Codex credential presence preflight (no API calls) | $CODEX_PREFLIGHT_RESULT |"
+            echo ''
+            echo "Commit: \`$COMMIT_SHA\`"
+            echo "Run: $RUN_URL"
+            echo ''
+            echo 'Agent runner: NOT CONNECTED. No autonomous code generation or environment promotion occurred.'
+            echo 'Open the individual jobs above for step-level timestamps and logs.'
+          } >> "$GITHUB_STEP_SUMMARY"
+  codex_connection_preflight:
+    needs: [verify, next_task_gate]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai' && needs.verify.result == 'success' && needs.next_task_gate.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check Codex configuration without using credentials
+        env:
+          KEY_PRESENT: ${{ secrets.OPENAI_API_KEY != '' }}
+        run: |
+          node --input-type=module <<'JS'
+          import {codexPreflight} from './agent/codex-preflight.mjs';
+          const keyPresent=process.env.KEY_PRESENT==='true';
+          // Do not pass the API key into this job; presence is only a boolean.
+          const result=codexPreflight({
+            repository:process.env.GITHUB_REPOSITORY,
+            branch:process.env.GITHUB_REF_NAME,
+            monthlyBudgetUsd:5,
+            credentialsProvisioned:keyPresent,
+            hardStopVerified:false,
+            readOnlySandboxVerified:false,
+            liveQuotesEnabled:false,
+            productionAccess:false
+          });
+          if(result.ready || result.apiCallsEnabled)throw Error('Unsafe Codex activation');
+          const status=keyPresent?'present':'missing';
+          console.log(JSON.stringify({stage:'codex_preflight',secretStatus:status,ready:false,reason:result.reason,apiCallsMade:0}));
+          console.log('No API requests, paid operations, or autonomous code changes performed.');
+          JS
+      - name: Verify Codex task runner stays disabled until spending controls are proven
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {prepareCodexRun} from './agent/codex-runner-config.mjs';
+          const plan=prepareCodexRun({ready:true,mode:'read_only'},{
+            repository:process.env.GITHUB_REPOSITORY,
+            branch:process.env.GITHUB_REF_NAME,
+            monthlyBudgetUsd:5,
+            credentialsProvisioned:false,
+            hardStopVerified:false,
+            readOnlySandboxVerified:false,
+            liveQuotesEnabled:false,
+            productionAccess:false
+          });
+          assert.equal(plan.ready,false);
+          assert.equal(plan.reason,'hard_spend_stop_unverified');
+          console.log(JSON.stringify({stage:'codex_runner_dry_run',ready:false,reason:plan.reason,apiCallsMade:0}));
+          JS
+  github_oidc_signature_probe:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify real GitHub OIDC signature and claims without printing token
+        env:
+          EXPECTED_AUDIENCE: smarttrade-codex-budget
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {verifyGitHubOidc} from './agent/github-oidc-verify.mjs';
+          const requestUrl=process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
+          const requestToken=process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+          assert.ok(requestUrl && requestToken, 'OIDC request environment unavailable');
+          const endpoint=new URL(requestUrl);
+          assert.equal(endpoint.protocol,'https:');
+          endpoint.searchParams.set('audience',process.env.EXPECTED_AUDIENCE);
+          const response=await fetch(endpoint,{
+            headers:{authorization:'Bearer '+requestToken},
+            signal:AbortSignal.timeout(10000)
+          });
+          assert.equal(response.status,200,'GitHub OIDC token request failed');
+          const payload=await response.json();
+          assert.equal(typeof payload.value,'string');
+          const verdict=await verifyGitHubOidc(payload.value,{audience:process.env.EXPECTED_AUDIENCE});
+          console.log(JSON.stringify({stage:'github_oidc_signature_probe',allowed:verdict.allowed,mode:verdict.mode??null,reason:verdict.reason??null,tokenPrinted:false,cloudflareCalls:0,codexCalls:0}));
+          assert.equal(verdict.allowed,true,'GitHub OIDC verification failed');
+          assert.equal(verdict.mode,'read_only');
+          JS
+      - name: Probe live isolated budget gateway with GitHub OIDC (read-only)
+        env:
+          EXPECTED_AUDIENCE: smarttrade-codex-budget
+          SANDBOX_ORIGIN: https://smarttrade-codex-budget-sandbox.goshen-r.workers.dev
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const base=new URL(process.env.SANDBOX_ORIGIN);
+          assert.equal(base.protocol,'https:');
+          assert.equal(base.hostname,'smarttrade-codex-budget-sandbox.goshen-r.workers.dev');
+          const url=new URL('/internal/budget/ping',base);
+          const anonymous=await fetch(url,{method:'POST',signal:AbortSignal.timeout(10000)});
+          assert.equal(anonymous.status,401,'Anonymous request must be rejected');
+          const reserve=await fetch(new URL('/reserve',base),{method:'POST',signal:AbortSignal.timeout(10000)});
+          assert.equal(reserve.status,404,'Public reservation endpoint must remain closed');
+          const oidcEndpoint=new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
+          assert.equal(oidcEndpoint.protocol,'https:');
+          oidcEndpoint.searchParams.set('audience',process.env.EXPECTED_AUDIENCE);
+          const tokenResponse=await fetch(oidcEndpoint,{
+            headers:{authorization:'Bearer '+process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN},
+            signal:AbortSignal.timeout(10000)
+          });
+          assert.equal(tokenResponse.status,200,'OIDC issuance failed');
+          const {value:token}=await tokenResponse.json();
+          assert.equal(typeof token,'string');
+          const response=await fetch(url,{
+            method:'POST',
+            headers:{authorization:'Bearer '+token},
+            signal:AbortSignal.timeout(15000)
+          });
+          const body=await response.json().catch(()=>({}));
+          console.log(JSON.stringify({
+            stage:'live_budget_oidc_ping',
+            status:response.status,
+            authenticated:body.authenticated===true,
+            budgetConnected:body.budgetConnected===true,
+            budgetReservationsEnabled:body.budgetReservationsEnabled,
+            anonymousStatus:anonymous.status,
+            reservationStatus:reserve.status,
+            codexCalls:0
+          }));
+          assert.equal(response.status,200,'Authenticated budget probe failed');
+          assert.equal(body.authenticated,true);
+          assert.equal(body.budgetConnected,true);
+          assert.equal(body.budgetReservationsEnabled,false);
+          JS
