@@ -324,6 +324,7 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
+          import {probeDiagnosticStorage} from './agent/codex-live-storage-probe.mjs';
           const base=new URL(process.env.SANDBOX_ORIGIN);
           assert.equal(base.protocol,'https:');
           assert.equal(base.hostname,'smarttrade-codex-budget-sandbox.goshen-r.workers.dev');
@@ -362,4 +363,7 @@ jobs:
           assert.equal(body.authenticated,true);
           assert.equal(body.budgetConnected,true);
           assert.equal(body.budgetReservationsEnabled,false);
+          // Writes only diagnostic:persistence:v1; never touches budget ledger keys.
+          console.log(JSON.stringify(await probeDiagnosticStorage({token})));
           JS
+
