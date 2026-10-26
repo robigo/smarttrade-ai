@@ -15,18 +15,27 @@ const handler=ctx.handlePrivatePortfolio;
 const url=new URL('https://preview.invalid/api/private/portfolio');
 function mockDb(){
  const records=new Map();
- return {records,prepare(sql){return {bind(...args){this.args=args;return this},async first(){
-  const row=records.get(this.args[0]);return row||null;
- },async run(){
-  if(sql.startsWith('INSERT')){
-   const [id,json]=this.args;if(records.has(id))return {meta:{changes:0}};
-   records.set(id,{version:1,snapshot_json:json});return {meta:{changes:1}};
-  }
-  const [json,id,version]=this.args;
-  const row=records.get(id);
-  if(!row||row.version!==version)return {meta:{changes:0}};
-  records.set(id,{version:version+1,snapshot_json:json});return {meta:{changes:1}};
- }}}}};
+ function prepare(sql){
+  return {
+   args:[],
+   bind(...args){this.args=args;return this;},
+   async first(){return records.get(this.args[0])||null;},
+   async run(){
+    if(sql.startsWith('INSERT')){
+     const [id,json]=this.args;
+     if(records.has(id))return {meta:{changes:0}};
+     records.set(id,{version:1,snapshot_json:json});
+     return {meta:{changes:1}};
+    }
+    const [json,id,version]=this.args;
+    const row=records.get(id);
+    if(!row||row.version!==version)return {meta:{changes:0}};
+    records.set(id,{version:version+1,snapshot_json:json});
+    return {meta:{changes:1}};
+   }
+  };
+ }
+ return {records,prepare};
 }
 const request=(method,body)=>new Request(url,{method,headers:method==='PUT'?{'origin':url.origin,'content-type':'application/json'}:undefined,body:method==='PUT'?JSON.stringify(body):undefined});
 test('private portfolios are isolated by Google subject',async()=>{
