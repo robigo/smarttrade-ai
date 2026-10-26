@@ -10,8 +10,19 @@ async function seal(secret,obj){const data=b64u(te.encode(JSON.stringify(obj)));
 async function unseal(secret,value){if(!value||!value.includes('.'))return null;const [data,sig]=value.split('.');if(!data||!sig||await mac(secret,data)!==sig)return null;try{return JSON.parse(new TextDecoder().decode(from64(data)))}catch{return null}}
 function getCookie(req,name){return (req.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(name+'='))?.slice(name.length+1)}
 function ready(env){return !!(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&env.GOOGLE_SESSION_SECRET?.length>=32&&env.GOOGLE_ALLOWED_EMAIL)}
-const redirectUri='https://smarttrade-ai-preview.goshen-r.workers.dev/auth/google/callback';
-const home='https://smarttrade-ai-preview.goshen-r.workers.dev/';
+const previewOrigin='https://smarttrade-ai-preview.goshen-r.workers.dev';
+// Only the existing Preview host has a compatibility default. Other targets
+// require an explicit, reviewed origin; never trust Host or forwarded headers.
+export function authOrigin(env,requestOrigin){
+  const configured=env.AUTH_PUBLIC_ORIGIN;
+  if(configured===undefined)return requestOrigin===previewOrigin?previewOrigin:null;
+  if(typeof configured!=='string')return null;
+  try{
+    const url=new URL(configured);
+    if(url.protocol!=='https:'||url.username||url.password||url.pathname!=='/'||url.search||url.hash||configured!==url.origin)return null;
+    return requestOrigin===url.origin?url.origin:null;
+  }catch{return null}
+}
 async function verifyIdToken(jwt,clientId,nonce){
   const parts=jwt.split('.');if(parts.length!==3)throw Error('token');
   const header=JSON.parse(new TextDecoder().decode(from64(parts[0])));
@@ -29,6 +40,10 @@ async function verifyIdToken(jwt,clientId,nonce){
 export async function handleAuth(req,env,url){
   if(!ready(env))return json({error:'auth_not_configured'},503);
   if(req.method!=='GET')return json({error:'method_not_allowed'},405);
+  const origin=authOrigin(env,url.origin);
+  if(!origin)return json({error:'auth_origin_not_configured'},503);
+  const redirectUri=origin+'/auth/google/callback';
+  const home=origin+'/';
   const path=url.pathname;
   if(path==='/auth/google/start'){
     const state=rand(24),nonce=rand(24),verifier=rand(32);

@@ -64,7 +64,7 @@ jobs:
             echo "::error::Cloudflare Account ID must be exactly 32 hexadecimal characters (after normalization)."
             exit 1
           fi
-          npx --yes wrangler@4.151.2 deploy --config wrangler.preview.json
+          npx --yes wrangler@4.151.2 deploy --config wrangler.preview.json --var RELEASE_SHA:"$GITHUB_SHA"
       - name: Check preview health
         run: |
           node --input-type=module <<'JS'
@@ -74,7 +74,7 @@ jobs:
             try {
               const r=await fetch(url,{signal:AbortSignal.timeout(8000),cache:'no-store'});
               const d=await r.json();
-              if(r.ok&&d.status==='ok'&&d.service==='smarttrade-ai-preview'){ok=true;break}
+              if(r.ok&&d.status==='ok'&&d.service==='smarttrade-ai-preview'&&d.revision===process.env.GITHUB_SHA){ok=true;break}
             } catch {}
             await new Promise(resolve=>setTimeout(resolve,3000));
           }
@@ -119,8 +119,34 @@ jobs:
           console.log('Preview UI and anonymous auth status checks passed.');
           console.log('Post-deploy anonymous-access checks passed; no quotes requested from provider.');
           JS
+  post_deploy_browser_smoke:
+    needs: post_deploy_auth_guard
+    if: github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Cache Playwright browser binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-1.56.1-${{ runner.os }}
+      - name: Install browser test dependency
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Test deployed Preview before advancing the handoff
+        env:
+          SMOKE_BASE: https://smarttrade-ai-preview.goshen-r.workers.dev
+          EXPECTED_SHA: ${{ github.sha }}
+        run: node test/preview-ui-smoke.mjs
   next_task_gate:
-    needs: [verify, deploy, post_deploy_auth_guard]
+    needs: [verify, deploy, post_deploy_auth_guard, post_deploy_browser_smoke]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai' && needs.verify.result == 'success' && needs.deploy.result == 'success' && needs.post_deploy_auth_guard.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:

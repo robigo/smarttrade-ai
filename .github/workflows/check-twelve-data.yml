@@ -1,38 +1,26 @@
-name: Check Twelve Data connection
-
+name: SmartTrade Market Access Guard (no provider calls)
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '7,22,37,52 * * * *'
-
 permissions:
   contents: read
-
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Check quote availability without publishing prices
-        env:
-          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
-        shell: bash
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify anonymous Preview requests stay blocked
         run: |
-          python3 - <<'PY'
-          import json, os, sys, urllib.parse, urllib.request
-          key = os.getenv("TWELVE_DATA_API_KEY", "")
-          if not key:
-              print("FAIL: TWELVE_DATA_API_KEY secret is missing")
-              sys.exit(1)
-          url = "https://api.twelvedata.com/quote?" + urllib.parse.urlencode({"symbol":"AAPL","apikey":key})
-          try:
-              with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent":"SmartTrade-connection-check/1.0"}), timeout=15) as response:
-                  data = json.load(response)
-              if data.get("status") == "error" or "close" not in data:
-                  print("FAIL: API returned no usable quote (check key, plan or quota)")
-                  sys.exit(1)
-              print("PASS: API key accepted and AAPL quote fields received")
-          except Exception:
-              print("FAIL: request failed (network, key, quota, or API response)")
-              sys.exit(1)
-          PY
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const base='https://smarttrade-ai-preview.goshen-r.workers.dev';
+          for(const path of ['/api/market/status','/api/market/quote?symbol=AAPL']){
+            const response=await fetch(base+path,{redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(8000)});
+            assert.equal(response.status,401);
+            assert.equal(response.headers.get('cache-control'),'no-store');
+            assert.equal((await response.json()).error,'unauthorized');
+          }
+          console.log('PASS: anonymous access blocked. No provider key or direct provider request.');
+          JS

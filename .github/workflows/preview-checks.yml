@@ -21,6 +21,10 @@ jobs:
           node --check cloudflare/src/preview.js
           node --test test/*.test.mjs
           node --check cloudflare/src/market-quota-do.mjs
+      - name: Validate separate release configurations
+        run: python3 scripts/check-release-config.py
+      - name: Bundle Production candidate without deploying
+        run: npx --yes wrangler@4.151.2 deploy --dry-run --config wrangler.toml
       - name: Validate isolated preview config and assets
         run: |
           node --input-type=module <<'JS'

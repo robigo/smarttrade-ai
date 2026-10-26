@@ -4,7 +4,7 @@ import {handleAuth,getAuthorizedSession} from './auth.js';
 export default {
   async fetch(request,env) {
     const url=new URL(request.url);
-    if(url.pathname==='/health') return new Response(JSON.stringify({status:'ok',service:'smarttrade-ai-preview',mode:'auth-preview'}),{headers:{'content-type':'application/json','cache-control':'no-store'}});
+    if(url.pathname==='/health') return new Response(JSON.stringify({status:'ok',service:'smarttrade-ai-preview',mode:'auth-preview',revision:env.RELEASE_SHA||null}),{headers:{'content-type':'application/json','cache-control':'no-store'}});
     if(url.pathname.startsWith('/auth/')) return handleAuth(request,env,url);
     if(url.pathname==='/api/market/status'){
       if(request.method!=='GET')return new Response(JSON.stringify({error:'method_not_allowed'}),{status:405,headers:{'content-type':'application/json','cache-control':'no-store'}});
