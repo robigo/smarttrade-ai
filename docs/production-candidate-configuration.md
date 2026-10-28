@@ -28,3 +28,49 @@ session expiry, cookie/CSRF protections, mobile/desktop UAT and non-production
 rollback on the exact candidate SHA. Review Production build logs, the generated
 readiness report, and obtain explicit owner deployment approval. The health
 endpoint is a liveness signal, not readiness or evidence that these gates passed.
+
+## Preview-first release procedure (RC is not a gate)
+
+The isolated `smarttrade-ai-rc` experiment is **not** a prerequisite for this
+release. Its unresolved Google `invalid_client` observation neither proves
+nor disproves whether the separately registered Production OAuth client works.
+Do not copy RC secrets, session cookies or callback URLs into Production.
+
+**Pre-approval checks (read only):**
+1. Pin PR #65's exact SHA; require successful offline unit tests, Browser Smoke,
+   deployed Preview API guards, release config check, and Wrangler dry-run.
+   An intermittent Preview network check requires a documented retry, not
+   suppression of a security assertion.
+2. Verify real Google login/logout is still working on the *existing Preview*
+   Worker, including an unauthorized session and restricted market endpoints.
+   Preview success is evidence for shared code, **not** proof of Production OAuth.
+3. Record the currently deployed Production version, its original
+   `cloudflare/src/index.js` build command and a rehearsed rollback procedure.
+   Review the difference between the legacy private quote gateway and the new
+   UI: intentionally dropping the old bearer endpoint is a compatibility change.
+4. Review the distinct **Production** Google OAuth client and its callback
+   `https://smarttrade-ai.goshen-r.workers.dev/auth/google/callback`.
+   Confirm its approved test user and that secrets/session key are different
+   from Preview; validate only names and settings, never expose secret values.
+5. Record the proposed Worker runtime variable:
+   `AUTH_PUBLIC_ORIGIN=https://smarttrade-ai.goshen-r.workers.dev`.
+   The current Production Worker has not yet been configured for this candidate.
+6. Review Cloudflare Workers Builds: automatic builds remain disabled, and its
+   *existing* deployment command points at the legacy `index.js`. The future
+   command for this candidate is `npx wrangler deploy --config wrangler.toml`.
+   A dry-run alone does not change this dashboard setting.
+
+**Release approval boundary:** Stop here. Obtain explicit approval identifying
+the production deployment, exact SHA, changed Worker/Secrets/build settings,
+the possibility of quota/billing impact, and the rollback version. Never merge,
+deploy, overwrite existing OAuth secrets, change routes, or enable market feeds
+merely because CI passes. Avoid creating additional RC Workers.
+
+**Only after approval:** apply reviewed Production-only configuration in a
+controlled change window; deploy the exact reviewed SHA with a verified rollback
+path. Verify the release version, real Google login and logout, cookie/session
+isolation, authenticated and unauthenticated guards, browser/mobile access,
+simulation-only behavior, restricted market data, and absence of live trading.
+If any gate fails, stop rollout and restore the recorded previous version.
+Document the final GO/NO-GO result. This checklist is not evidence of any
+successful Production end-to-end authentication.
