@@ -1,11 +1,29 @@
 name = "smarttrade-ai"
-main = "cloudflare/src/index.js"
+main = "cloudflare/src/production.js"
 compatibility_date = "2026-10-19"
 workers_dev = true
 preview_urls = false
 
-# No assets directory: deploy only the Worker script.
-# Keep TWELVE_DATA_API_KEY and SMARTTRADE_ACCESS_TOKEN as Cloudflare secrets.
+# Candidate only. Existing public workers.dev URL is retained. A reviewed
+# AUTH_PUBLIC_ORIGIN, separate Google credentials/session secret, and
+# explicit release approval are required.
+# No live market data, legacy bearer API, D1 binding, or production deploy CI.
+[assets]
+directory = "./preview-public"
+binding = "ASSETS"
+run_worker_first = true
+
+[vars]
+MARKET_DISPLAY_APPROVED = "false"
+MARKET_QUOTA_GUARD_READY = "false"
+
+[[durable_objects.bindings]]
+name = "MARKET_QUOTA"
+class_name = "MarketQuota"
+
+[[migrations]]
+tag = "v1_market_quota"
+new_sqlite_classes = ["MarketQuota"]
 
 # Required by Cloudflare Workers Builds when running `npx wrangler preview`.
 # Does not enable Preview URLs or change the production deploy command.

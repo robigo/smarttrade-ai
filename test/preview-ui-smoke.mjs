@@ -1,12 +1,25 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 
+const base=process.env.SMOKE_BASE||'http://127.0.0.1:8765';
+const deployed=base==='https://smarttrade-ai-preview.goshen-r.workers.dev';
+assert.ok(deployed||base==='http://127.0.0.1:8765','Only local assets or isolated Preview may be tested');
+async function verifyRevision(){
+  if(!deployed)return;
+  assert.match(process.env.EXPECTED_SHA||'',/^[0-9a-f]{40}$/);
+  const response=await fetch(base+'/health',{cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(8000)});
+  assert.equal(response.status,200);
+  const health=await response.json();
+  assert.equal(health.service,'smarttrade-ai-preview');
+  assert.equal(health.revision,process.env.EXPECTED_SHA,'Deployed SHA differs from tested source');
+}
+await verifyRevision();
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('http://127.0.0.1:8765/', { waitUntil: 'domcontentloaded' });
+  await page.goto(base+'/', { waitUntil: 'domcontentloaded' });
   assert.match(await page.title(), /SmartTrade AI/);
   assert.match(await page.locator('#cash').innerText(), /15,000/);
 
@@ -50,8 +63,8 @@ try {
   }));
   await page.locator('#googleLogin').click();
   await page.waitForURL('**/auth/google/start');
-  assert.equal(new URL(page.url()).origin, 'http://127.0.0.1:8765');
-  await page.goto('http://127.0.0.1:8765/', { waitUntil: 'domcontentloaded' });
+  assert.equal(new URL(page.url()).origin, base);
+  await page.goto(base+'/', { waitUntil: 'domcontentloaded' });
   await page.route('**/health', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ status: 'ok', service: 'smarttrade-ai-preview' })
@@ -61,7 +74,8 @@ try {
   await page.unrouteAll();
   
   assert.deepEqual(errors, [], 'Unexpected browser errors');
-  console.log('Preview UI smoke tests passed (local static assets; no real trades).');
+  await verifyRevision();
+  console.log('Preview UI smoke tests passed (browser simulation; no real trades).');
 } finally {
   await browser.close();
 }

@@ -1,5 +1,7 @@
 name: SmartTrade Preview UI Smoke Tests
 on:
+  pull_request:
+    branches: [main, preview/cloudflare-unified-v09]
   push:
     branches:
       - preview/cloudflare-unified-v09
