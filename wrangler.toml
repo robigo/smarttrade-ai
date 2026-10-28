@@ -1,11 +1,12 @@
 name = "smarttrade-ai"
 main = "cloudflare/src/production.js"
 compatibility_date = "2026-10-19"
-workers_dev = false
+workers_dev = true
 preview_urls = false
 
-# Candidate only. A reviewed route and AUTH_PUBLIC_ORIGIN, separate Google
-# credentials/session secret, and explicit release approval are required.
+# Candidate only. Existing public workers.dev URL is retained. A reviewed
+# AUTH_PUBLIC_ORIGIN, separate Google credentials/session secret, and
+# explicit release approval are required.
 # No live market data, legacy bearer API, D1 binding, or production deploy CI.
 [assets]
 directory = "./preview-public"

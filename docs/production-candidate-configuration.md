@@ -3,7 +3,7 @@
 This change prepares a reviewable candidate. It does not authorize a merge,
 Production deployment, Google configuration change, D1 resource, or market-data activation.
 
-- `wrangler.toml` targets `smarttrade-ai`, with public workers.dev and preview URLs disabled and no route configured. It bundles the same UI and market/auth handlers as Preview through `production.js`. The legacy bearer `/api/quote` is not exposed.
+- `wrangler.toml` targets `smarttrade-ai`, with the existing public workers.dev URL enabled, preview URLs disabled, and no custom route configured. It bundles the same UI and market/auth handlers as Preview through `production.js`. The legacy bearer `/api/quote` is not exposed.
 - `wrangler.preview.json` still targets only `smarttrade-ai-preview`; no Preview resources or secrets are copied to Production.
 - Production requires a reviewed HTTPS `AUTH_PUBLIC_ORIGIN` with no trailing slash, path, query, fragment or credentials. Requests must match this origin; the Preview origin is forbidden as a Production origin. Missing configuration fails closed. Preview retains its existing origin as a compatibility default.
 - Register that origin plus `/auth/google/callback` in a separate reviewed Google OAuth configuration. Use separate Google credentials and `GOOGLE_SESSION_SECRET`; retain the single-user `GOOGLE_ALLOWED_EMAIL` restriction. Do not reuse a Preview session secret.
@@ -17,6 +17,10 @@ Production deployment, Google configuration change, D1 resource, or market-data 
 Run `python3 scripts/check-release-config.py`, offline Node regression tests,
 and the CI Wrangler dry-run. The dry-run does not apply Durable Object migrations.
 Do not deploy to Preview merely to obtain a green check while reviewing this PR.
+
+The intended origin is `https://smarttrade-ai.goshen-r.workers.dev`; set `AUTH_PUBLIC_ORIGIN` only after reviewing the distinct Production OAuth client and callback. Do not hard-code OAuth secrets in the repository.
+
+Cloudflare Workers Builds has a separate Production deploy command currently targeting `cloudflare/src/index.js`. The candidate dry-run uses `wrangler.toml` and does not prove the dashboard deploy command is aligned. Production automatic builds have been disabled by the owner; keep them disabled until the actual release pipeline is reviewed and approved.
 
 Before any Production deployment, record the reviewed domain/route, separate
 secrets and Google callback configuration; verify real Google login/logout,

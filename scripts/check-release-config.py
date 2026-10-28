@@ -7,9 +7,9 @@ production = tomllib.loads(Path('wrangler.toml').read_text())
 preview = json.loads(Path('wrangler.preview.json').read_text())
 assert production['name'] == 'smarttrade-ai'
 assert production['main'] == 'cloudflare/src/production.js'
-assert production['workers_dev'] is False
+assert production['workers_dev'] is True
 assert production['preview_urls'] is False
-assert not production.get('routes'), 'Production route requires separate review'
+assert not production.get('routes'), 'Production custom route requires separate review'
 assert preview['name'] == 'smarttrade-ai-preview'
 assert preview['main'] == 'cloudflare/src/preview.js'
 assert preview['workers_dev'] is True
@@ -21,4 +21,4 @@ for config in (production, preview):
     assert not config.get('d1_databases'), 'D1 must stay disabled'
     assert config.get('vars', {}).get('PORTFOLIO_SYNC_ENABLED') != 'true'
 assert production['vars'] == {'MARKET_DISPLAY_APPROVED': 'false', 'MARKET_QUOTA_GUARD_READY': 'false'}
-print('PASS: separate runtime targets, shared UI/guards, market and D1 disabled; no production route')
+print('PASS: separate runtime targets, shared UI/guards, market and D1 disabled; production workers.dev only, no custom route')
