@@ -19,6 +19,12 @@ is the only account allowed to use the browser quote endpoint.
 - Quotes are requested only by a button click. There is no automatic polling,
   batch request, WebSocket subscription or retry loop. Returned prices remain
   separate from local and account simulation portfolio calculations.
+- Each watchlist row has a manual price button. The row and main quote panel share
+  results for the same symbol. Adding/removing rows makes no provider request;
+  displayed prices survive row rerenders but are not written to browser storage
+  and disappear on page reload. A failed refresh preserves the last valid price
+  with an error message; a 401 clears displayed quotes. One pending request disables
+  all quote buttons to avoid accidental duplicate credit consumption.
 - A new SQLite Durable Object binding on the same existing Worker reserves each
   request before contacting the provider. The Google route and existing authorized
   bearer route share the same instance and its 8/minute, 800/UTC-day limits.

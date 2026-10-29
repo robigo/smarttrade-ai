@@ -11,6 +11,7 @@ export function buildExistingProductionHtml(html){
  return html.replace('SmartTrade AI · v0.14 Preview','SmartTrade AI · v0.14')
  .replace('גישה למחירים עדיין אינה מופעלת.','שליפה ידנית ללמידה עצמית בלבד, לאחר התחברות. אין רענון אוטומטי.')
  .replace('המחירים ייטענו רק למשתמש Google מורשה ורק לאחר הפעלת רישוי בשרת. אין השפעה על מחירי הסימולציה או על שווי התיק.','שליפה ידנית דרך חשבון Basic למשתמש Google המורשה בלבד. עד 8 קרדיטים בדקה ו־800 ביום דרך כלי זה. אין השפעה על מחירי הסימולציה או על שווי התיק.')
+ .replace('מעקב בלבד. עדיין אין מחירי Twelve Data בממשק הציבורי.','לשליפת מחיר פרטי ללמידה, לחץ על שלוף מחיר ליד הנייר לאחר התחברות. המחירים אינם מתעדכנים אוטומטית ואינם נשמרים לאחר רענון הדף.')
  .replace(/<select id="liveSymbol">[\s\S]*?<\/select>/,'<select id="liveSymbol">'+options+'</select>')
  .replace(/<select id="watchChoice">[\s\S]*?<\/select>/,'<select id="watchChoice">'+options+'</select>')
  .replace("watchAllowed=['AAPL','MSFT','SPY']",'watchAllowed='+JSON.stringify(PERSONAL_SYMBOLS))
