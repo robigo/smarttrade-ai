@@ -12,7 +12,7 @@
    const data=await r.json();
    if(r.status===401){output.textContent='יש להתחבר באמצעות Google.';return}
    if(r.status===429){output.textContent='הגעת למכסת הבקשות. '+(data.retryAfterSeconds?'אפשר לנסות שוב בעוד '+data.retryAfterSeconds+' שניות.':'נסה שוב מאוחר יותר.');return}
-   if(!r.ok){output.textContent=messages[data.error]||'לא ניתן לקבל מחיר כרגע ('+r.status+').';return}
+   if(!r.ok){output.textContent=(data.error==='provider_timeout'?'הספק לא השיב בזמן.':data.error==='provider_connection_failed'?'החיבור לספק נכשל.':messages[data.error]||'לא ניתן לקבל מחיר כרגע ('+r.status+').')+(Number.isSafeInteger(data.providerCode)?' קוד ספק: '+data.providerCode+'.':'');return}
    output.textContent=data.symbol+': '+data.price+' '+data.currency+' · מקור: Twelve Data · מועד הספק: '+(data.providerTime||'לא נמסר')+' · נשלף: '+new Date(data.receivedAt).toLocaleString('he-IL')+' · ללמידה בלבד; אינו משנה את תיק הסימולציה.';
   }catch{output.textContent='לא ניתן לקבל מחיר כרגע.'}
   finally{button.disabled=false}

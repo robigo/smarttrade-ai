@@ -25,7 +25,10 @@ is the only account allowed to use the browser quote endpoint.
   quote database or public edge cache is created.
 - These counters cover this Worker only. Other applications using the same key
   share the provider's real account quota; upstream 429s are still respected.
-- Provider timestamps/source are displayed. A successful fetch does not certify
+- The provider's Basic `/price` endpoint is used for a single latest price (one
+  credit per symbol), instead of the richer `/quote` endpoint. It supplies no
+  provider timestamp; the UI marks that timestamp as unknown and shows fetch time
+  and source. A successful fetch does not certify
   exchange-wide coverage, real-time entitlement or data freshness.
 
 The Basic credit limits and midnight UTC reset are described in the provider's
