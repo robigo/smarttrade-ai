@@ -51,3 +51,7 @@ Build optional assets with `npm run build:existing-production` and run compatibi
 with `npm run test:existing-production`. `wrangler.existing-production.json` targets the
 same Worker with the feature disabled; it does not bind a database or change Google settings.
 See `docs/existing-production-adaptation.md` before any activation or production deployment.
+
+## Active production deployment
+
+The existing Worker is active with account persistence. The owner confirmed Google login and save/refresh/reload on 2026-10-29. Use `npm.cmd run check:production` for a guarded dry-run or `npm.cmd run deploy:production` for an authorized release, with Cloudflare credentials supplied in the environment. These commands verify the live production DB fingerprint and preserve bindings/secrets. Do not deploy the legacy baseline config over the active account app. See `docs/existing-production-adaptation.md` for evidence and rollback.

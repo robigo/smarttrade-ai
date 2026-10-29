@@ -1,5 +1,49 @@
 # Adapt the current production gateway
 
+## Production activation — 2026-10-29
+
+The owner explicitly requested connection and verification after reviewing the remaining
+storage and Google callback requirements. The existing Worker `smarttrade-ai` was
+activated at https://smarttrade-ai.goshen-r.workers.dev/ with a separate production
+account database. No Preview data was copied. Existing Google and gateway secrets
+were preserved; no new Worker or OAuth client was created.
+
+- Active version: `401d8bab-4fc4-46a7-bb15-274e896390f2`.
+- Previous version / emergency rollback: `a1725f93-82d7-498f-bd6d-ca459c961d7e`.
+- Production callback: https://smarttrade-ai.goshen-r.workers.dev/auth/google/callback .
+  The actual post-deployment OAuth start reached Google's sign-in identifier page,
+  without redirect mismatch or invalid-client errors. This does not claim completion
+  of a personal Google sign-in.
+- Production DB schema was applied before activation. Nine checks exercised the actual
+  portfolio handler with synthetic local sessions against the remote production DB,
+  including persistence, stale writes, identity separation and origin guards.
+  Only test subjects were removed after verification. No live personal session was forged.
+- 23 compatibility/config tests passed. The live site returned expected HTTP statuses
+  on ten routes. The published HTML and script exactly matched the built assets.
+- Live Chromium checks passed at 390, 768 and 1280 pixels, without horizontal overflow,
+  JavaScript errors or external requests. Browser checks performed GET requests only.
+- Existing gateway authorization remained intact. No paid quote requests were made;
+  the new account UI's market access remains disabled. Preview callback is unchanged.
+- The DB binding and live feature flags were verified from Worker settings after deploy.
+- Human acceptance completed: the owner confirmed Google login, portfolio load,
+  and preservation of a saved change after refresh/reload in the chat on 2026-10-29.
+  This is owner-reported evidence; the agent did not access a personal session.
+  Existing Preview portfolios are not copied automatically.
+
+Deployment uses the ignored operator config `wrangler.accounts-existing-production.json`
+with `--keep-vars`. Do not deploy the baseline `wrangler.toml` or the disabled example
+over this release: they omit the active database/assets bindings. The new private config
+must be backed up within the operator's secure environment. The guarded operator commands below now validate and preserve the binding.
+Production CI remains separate from the existing automatic Preview workflow.
+
+Rollback, if needed: use pinned Wrangler to roll back the existing production Worker
+to the previous version above. Preserve the production database; rollback is not a
+database deletion or schema reversal. It restores the original gateway/Preview-auth
+behavior. No production rollback was performed during these non-disruptive checks.
+
+The remaining sections below record the earlier preparation state, before activation.
+
+
 Owner direction: retain the existing production infrastructure and make a minimal
 compatible extension. The separate `smarttrade-ai-app` experiment (PR #68) was closed
 without deployment; its branch remains recoverable.
@@ -68,3 +112,7 @@ Google setting or production database is created by preparing/building this code
 
 The existing production deployment is unchanged. This document describes a candidate
 extension and its evidence, not a completed production release.
+
+## Guarded production deployment
+
+Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in the operator environment without printing them. Run npm.cmd run check:production in the repository for a dry-run, or npm.cmd run deploy:production for an authorized release. Both commands build assets and read only the existing production Worker settings before deployment. They verify the PORTFOLIO_DB identifier against deployment/production-accounts.json and abort on missing/replaced bindings. The generated private config is removed before refresh, so a failed refresh cannot leave a stale deploy config. The commands preserve runtime secrets with --keep-vars; they do not create databases, migrate data, query D1 or call a quote provider. Production is not automatically deployed by Preview CI.
