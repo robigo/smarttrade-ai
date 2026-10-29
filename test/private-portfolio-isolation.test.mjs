@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source=fs.readFileSync(new URL('../cloudflare/src/private-portfolio.mjs',import.meta.url),'utf8');
-const script=source.replace(/^import .*;\n/gm,'').replace('export async function handlePrivatePortfolio','async function handlePrivatePortfolio')+'\nthis.handlePrivatePortfolio=handlePrivatePortfolio;';
+const script=source.replace(/^import .*;\r?\n/gm,'').replace('export async function handlePrivatePortfolio','async function handlePrivatePortfolio')+'\nthis.handlePrivatePortfolio=handlePrivatePortfolio;';
 let owner='owner-A';
 const initialPortfolio=()=>({cashCents:1500000,positions:{},trades:[]});
 const ctx={Response,TextEncoder,JSON,Number,URL,initialPortfolio,
@@ -37,7 +37,7 @@ function mockDb(){
  }
  return {records,prepare};
 }
-const request=(method,body)=>new Request(url,{method,headers:method==='PUT'?{'origin':url.origin,'content-type':'application/json'}:undefined,body:method==='PUT'?JSON.stringify(body):undefined});
+const request=(method,body)=>new Request(url,{method,headers:method==='PUT'?{'origin':url.origin,'content-type':'application/json','X-Account-Id':owner}:undefined,body:method==='PUT'?JSON.stringify(body):undefined});
 test('private portfolios are isolated by Google subject',async()=>{
  const database=mockDb(),env={PORTFOLIO_SYNC_ENABLED:'true',PORTFOLIO_DB:database};
  owner='owner-A';
@@ -61,6 +61,16 @@ test('stale updates cannot overwrite a newer version',async()=>{
  const stale=await handler(request('PUT',{version:1,snapshot:initialPortfolio()}),env,url);
  assert.equal(stale.status,409);
  assert.equal(database.records.get(owner).version,2);
+});
+
+test('a draft loaded by another account is rejected before any storage writes',async()=>{
+ const database=mockDb(),env={PORTFOLIO_SYNC_ENABLED:'true',PORTFOLIO_DB:database};
+ owner='owner-B';
+ const req=new Request(url,{method:'PUT',headers:{origin:url.origin,'content-type':'application/json','X-Account-Id':'owner-A'},body:JSON.stringify({version:0,snapshot:initialPortfolio()})});
+ const response=await handler(req,env,url);
+ assert.equal(response.status,403);
+ assert.equal((await response.json()).error,'account_changed');
+ assert.equal(database.records.size,0);
 });
 test('cross-site writes are blocked before storage operations',async()=>{
  const database=mockDb(),env={PORTFOLIO_SYNC_ENABLED:'true',PORTFOLIO_DB:database};

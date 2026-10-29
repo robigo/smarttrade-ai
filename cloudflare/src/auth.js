@@ -10,8 +10,13 @@ async function seal(secret,obj){const data=b64u(te.encode(JSON.stringify(obj)));
 async function unseal(secret,value){if(!value||!value.includes('.'))return null;const [data,sig]=value.split('.');if(!data||!sig||await mac(secret,data)!==sig)return null;try{return JSON.parse(new TextDecoder().decode(from64(data)))}catch{return null}}
 function getCookie(req,name){return (req.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(name+'='))?.slice(name.length+1)}
 function ready(env){return !!(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&env.GOOGLE_SESSION_SECRET?.length>=32&&env.GOOGLE_ALLOWED_EMAIL)}
-const redirectUri='https://smarttrade-ai-preview.goshen-r.workers.dev/auth/google/callback';
-const home='https://smarttrade-ai-preview.goshen-r.workers.dev/';
+function appOrigin(env){
+  try{
+    const url=new URL(env.GOOGLE_APP_ORIGIN||'https://smarttrade-ai-preview.goshen-r.workers.dev');
+    if(url.protocol!=='https:'||url.username||url.password||url.pathname!=='/'||url.search||url.hash)return null;
+    return url.origin;
+  }catch{return null}
+}
 async function verifyIdToken(jwt,clientId,nonce){
   const parts=jwt.split('.');if(parts.length!==3)throw Error('token');
   const header=JSON.parse(new TextDecoder().decode(from64(parts[0])));
@@ -28,12 +33,15 @@ async function verifyIdToken(jwt,clientId,nonce){
 }
 export async function handleAuth(req,env,url){
   if(!ready(env))return json({error:'auth_not_configured'},503);
+  const origin=appOrigin(env);
+  if(!origin)return json({error:'auth_origin_invalid'},503);
+  const redirectUri=origin+'/auth/google/callback',home=origin+'/';
   if(req.method!=='GET')return json({error:'method_not_allowed'},405);
   const path=url.pathname;
   if(path==='/auth/google/start'){
     const state=rand(24),nonce=rand(24),verifier=rand(32);
     const challenge=b64u(await crypto.subtle.digest('SHA-256',te.encode(verifier)));
-    const transaction=await seal(env.GOOGLE_SESSION_SECRET,{state,nonce,verifier,exp:Date.now()+300000});
+    const transaction=await seal(env.GOOGLE_SESSION_SECRET,{state,nonce,verifier,appOrigin:origin,exp:Date.now()+300000});
     const google=new URL('https://accounts.google.com/o/oauth2/v2/auth');
     for(const [k,v] of Object.entries({client_id:env.GOOGLE_CLIENT_ID,redirect_uri:redirectUri,response_type:'code',scope:'openid email profile',state,nonce,code_challenge:challenge,code_challenge_method:'S256',prompt:'select_account'}))google.searchParams.set(k,v);
     return new Response(null,{status:302,headers:{location:google.toString(),'set-cookie':cookie('st_oauth',transaction,300),'cache-control':'no-store'}});
@@ -41,7 +49,7 @@ export async function handleAuth(req,env,url){
   if(path==='/auth/google/callback'){
     const tx=await unseal(env.GOOGLE_SESSION_SECRET,getCookie(req,'st_oauth'));
     const headers=new Headers({'cache-control':'no-store','set-cookie':cookie('st_oauth','',0)});
-    if(!tx||tx.exp<Date.now()||url.searchParams.get('state')!==tx.state||!url.searchParams.get('code'))return json({error:'invalid_oauth_state'},401,Object.fromEntries(headers));
+    if(!tx||tx.appOrigin!==origin||tx.exp<Date.now()||url.searchParams.get('state')!==tx.state||!url.searchParams.get('code'))return json({error:'invalid_oauth_state'},401,Object.fromEntries(headers));
     let stage='token_exchange';
     try{
       const body=new URLSearchParams({code:url.searchParams.get('code'),client_id:env.GOOGLE_CLIENT_ID,client_secret:env.GOOGLE_CLIENT_SECRET,redirect_uri:redirectUri,grant_type:'authorization_code',code_verifier:tx.verifier});
@@ -67,15 +75,15 @@ export async function handleAuth(req,env,url){
   if(path==='/auth/logout')return new Response(null,{status:302,headers:{location:home,'set-cookie':cookie('st_session','',0),'cache-control':'no-store'}});
   if(path==='/auth/me'){
     const session=await unseal(env.GOOGLE_SESSION_SECRET,getCookie(req,'st_session'));
-    if(!session||session.exp<Date.now())return json({authenticated:false},401);
-    return json({authenticated:true,email:session.email});
+    if(!await getAuthorizedSession(req,env))return json({authenticated:false},401);
+    return json({authenticated:true,email:session.email,accountId:session.sub});
   }
   return json({error:'not_found'},404);
 }
 
 // Shared server-side session validation for protected preview routes.
 export async function getAuthorizedSession(req,env){
-  if(!ready(env))return null;
+  if(!ready(env)||!appOrigin(env))return null;
   const session=await unseal(env.GOOGLE_SESSION_SECRET,getCookie(req,'st_session'));
   if(!session||typeof session.exp!=='number'||session.exp<=Date.now()||typeof session.sub!=='string'||!session.sub||typeof session.email!=='string')return null;
   if(session.email.toLowerCase()!==env.GOOGLE_ALLOWED_EMAIL.trim().toLowerCase())return null;

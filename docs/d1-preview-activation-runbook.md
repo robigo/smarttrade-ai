@@ -22,7 +22,7 @@
 3. Deploy with `PORTFOLIO_SYNC_ENABLED` **unset**. Confirm authenticated `GET /api/private/portfolio` returns 503 and local browser state remains untouched.
 4. Run the server-side offline and isolated D1 integration tests; then run live authenticated tests using a dedicated non-production test user.
 5. Explicitly approve enabling `PORTFOLIO_SYNC_ENABLED=true` for Preview only. Confirm version 0 reads, initial PUT, updated PUT, 409 stale write, 403 cross-origin PUT, 401 anonymous requests and per-subject isolation.
-6. Add a deliberate opt-in UI for server snapshots only **after** legacy data mapping is tested. Never overwrite an existing local portfolio automatically.
+6. Verify the candidate opt-in account UI and legacy mapping described below. Never overwrite an existing local portfolio automatically.
 7. Run the full browser UAT and repeat checks from both desktop and mobile. Require a recorded Go/No-Go decision.
 
 ## Rollback (manual, Preview only)
@@ -34,3 +34,39 @@
 
 ## Production gate
 NO-GO until migration, real D1 restore, authenticated end-to-end tests, browser integration, monitoring, license-compliant market mode, owner acceptance and rollback rehearsal are documented. A 200 health response or green CI alone is insufficient.
+
+## Account UI candidate (not activated)
+
+The candidate adds a separate Google account portfolio panel with explicit load, save,
+draft export, whole-share paper trades, and confirmed copying from the legacy local portfolio.
+Account drafts stay in memory. No account portfolio is saved automatically or copied
+over the legacy browser state. A rejected or cancelled import leaves both portfolios intact.
+
+Legacy mapping converts ILS into exact integer cents and accepts whole-share quantities
+only. Fractional shares, fractional cents, unknown symbols, and inconsistent replayed
+ledgers are rejected with a visible message. Users can retain/export their local portfolio;
+the candidate never rounds positions or prices to make a migration pass.
+
+The account API contract now binds writes to the loaded identity:
+
+- `GET /auth/me` returns `accountId` (Google subject) for an authorized session.
+- `GET /api/private/portfolio` returns `{accountId, version, snapshot}`.
+- `PUT /api/private/portfolio` requires JSON `{version, snapshot}`, same-origin `Origin`,
+  and `X-Account-Id` equal to the current session subject. The header selects no owner;
+  the server always uses the signed session. A session switch returns 403 before writes.
+- A 409 response locks further editing/saving while keeping the draft exportable.
+  Reload requires confirmation if the draft has unsaved changes.
+
+`GOOGLE_APP_ORIGIN` configures the exact HTTPS app origin for OAuth callbacks and logout.
+It defaults to the existing Preview origin for compatibility. Before a later production
+deployment, register that environment's callback with Google and use separate reviewed
+runtime secrets. Origins containing paths, credentials, queries, or fragments are rejected.
+Changing the configured origin invalidates in-flight OAuth transactions.
+
+Local evidence uses the actual Worker and signed synthetic sessions with an in-memory
+database. It does not establish successful real Google sign-in, durable D1 storage,
+database restoration, or production readiness. The D1 binding and feature flag remain absent.
+
+Before activation, explicitly authorize a dedicated Preview D1 database and its costs,
+review the existing migration, backup/export and retention policy, and run the staged rollout
+above. Do not reuse a production database or enable market-provider calls for these tests.

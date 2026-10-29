@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync(new URL('../cloudflare/src/private-portfolio.mjs',import.meta.url),'utf8');
-const script=source.replace(/^import .*;\n/gm,'').replace('export async function handlePrivatePortfolio','async function handlePrivatePortfolio')+'\nthis.handlePrivatePortfolio=handlePrivatePortfolio;';
+const script=source.replace(/^import .*;\r?\n/gm,'').replace('export async function handlePrivatePortfolio','async function handlePrivatePortfolio')+'\nthis.handlePrivatePortfolio=handlePrivatePortfolio;';
 const initialPortfolio=()=>({cashCents:1500000,positions:{},trades:[]});
 let authorized=true;
 const context={Response,TextEncoder,JSON,Number,URL,initialPortfolio,
@@ -17,7 +17,7 @@ function db(){
  return {seen,prepare(sql){const p={bind(...args){this.args=args;return this},async first(){seen.push({sql,args:this.args});return row},async run(){seen.push({sql,args:this.args});if(sql.startsWith('INSERT')){if(row)return {meta:{changes:0}};row={version:1,snapshot_json:this.args[1]};return {meta:{changes:1}}}if(row?.version!==this.args[2])return {meta:{changes:0}};row={version:row.version+1,snapshot_json:this.args[0]};return {meta:{changes:1}}}};return p}}
 }
 const env=()=>({PORTFOLIO_SYNC_ENABLED:'true',PORTFOLIO_DB:db()});
-const request=(method,body,origin=url.origin)=>({method,headers:new Headers({'origin':origin,'content-type':'application/json'}),text:async()=>JSON.stringify(body)});
+const request=(method,body,origin=url.origin)=>({method,headers:new Headers({'origin':origin,'content-type':'application/json','X-Account-Id':'google-user-123'}),text:async()=>JSON.stringify(body)});
 test('rejects anonymous sessions and missing feature flag',async()=>{
  authorized=false;const e=env();
  assert.equal((await handler(request('GET'),e,url)).status,401);
@@ -27,7 +27,7 @@ test('rejects anonymous sessions and missing feature flag',async()=>{
 test('private GET returns initial portfolio without writing',async()=>{
  const e=env(),res=await handler(request('GET'),e,url);
  assert.equal(res.status,200);
- assert.deepEqual(await res.json(),{version:0,snapshot:initialPortfolio()});
+ assert.deepEqual(await res.json(),{accountId:'google-user-123',version:0,snapshot:initialPortfolio()});
  assert.equal(e.PORTFOLIO_DB.seen.length,1);
 });
 test('PUT enforces origin and integrity, then optimistic version checks',async()=>{
