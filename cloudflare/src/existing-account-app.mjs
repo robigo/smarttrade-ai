@@ -2,7 +2,7 @@
 import {getAuthorizedSession} from './auth.js';
 import {handlePrivatePortfolio} from './private-portfolio.mjs';
 import {personalMarketStatus,fetchPersonalQuote} from './personal-market.mjs';
-const paths=new Set(['/','/index.html','/account-client.js','/personal-market-client.js','/api/private/portfolio','/api/market/status','/api/market/quote','/_account/ready']);
+const paths=new Set(['/','/index.html','/account-client.js','/personal-market-client.js','/portfolio-chart.js','/portfolio-history-model.mjs','/api/private/portfolio','/api/market/status','/api/market/quote','/_account/ready']);
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 export async function handleExistingAccountApp(request,env,url){
  if(env.ACCOUNT_APP_ENABLED!=='true'||!paths.has(url.pathname))return null;

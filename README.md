@@ -63,3 +63,7 @@ Run `npm.cmd run backup:production` with Cloudflare credentials in the environme
 ## Private Basic learning data
 
 The existing production account app supports manually requested US stock and ETF prices from a shared 12-symbol catalog for the authorized Google account when the explicit personal-learning policy is enabled. It uses the existing server key and a shared 8/minute, 800/day quota guard, without polling, public distribution or portfolio-price changes. See `docs/personal-market-learning.md` for scope, validation and disabling the feature.
+
+## Local simulation value chart
+
+The production chart records a current baseline and later local portfolio observations after successful trades and price updates. A single point is visible; no prior history is invented. Reloads keep observations without duplicating the same state, and a manual snapshot button is available. This is separate from Twelve Data stock prices and the Google account ledger. See `docs/local-portfolio-chart.md`.
