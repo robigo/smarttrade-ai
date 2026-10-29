@@ -5,6 +5,9 @@
   "scripts": {
     "build:existing-production": "node scripts/build-existing-production-assets.mjs",
     "test:existing-production": "node --test test/existing-production.test.mjs",
-    "test:accounts": "node --test test/account-client-model.test.mjs test/auth-configured-origin.test.mjs test/auth-preview-offline.test.mjs test/auth-boundary-preprod.test.mjs test/private-portfolio-d1.test.mjs test/private-portfolio-isolation.test.mjs test/preview-auth-guard.test.mjs test/preview-csv-bond-regressions.test.mjs test/preview-portfolio-restore.test.mjs"
+    "test:accounts": "node --test test/account-client-model.test.mjs test/auth-configured-origin.test.mjs test/auth-preview-offline.test.mjs test/auth-boundary-preprod.test.mjs test/private-portfolio-d1.test.mjs test/private-portfolio-isolation.test.mjs test/preview-auth-guard.test.mjs test/preview-csv-bond-regressions.test.mjs test/preview-portfolio-restore.test.mjs",
+    "prepare:production": "node scripts/prepare-production-deployment.mjs",
+    "check:production": "npm run build:existing-production && npm run prepare:production && npx --yes wrangler@4.151.2 deploy --config wrangler.accounts-existing-production.json --keep-vars --dry-run",
+    "deploy:production": "npm run build:existing-production && npm run prepare:production && npx --yes wrangler@4.151.2 deploy --config wrangler.accounts-existing-production.json --keep-vars"
   }
 }
