@@ -1,5 +1,6 @@
 // Private, manually requested Basic quotes for the owner's learning tool.
-export const PERSONAL_SYMBOLS=Object.freeze(['AAPL','MSFT','SPY']);
+import {PERSONAL_SYMBOLS} from '../../app/personal-market-symbols.mjs';
+export {PERSONAL_SYMBOLS};
 const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json','cache-control':'no-store','x-content-type-options':'nosniff',...headers}});
 export function personalMarketStatus(env){
  const reason=env.MARKET_LEARNING_ENABLED!=='true'?'display_disabled':!env.TWELVE_DATA_API_KEY?'provider_not_configured':env.MARKET_QUOTA_GUARD_READY!=='true'||!env.MARKET_QUOTA?'quota_guard_not_ready':'personal_learning';
