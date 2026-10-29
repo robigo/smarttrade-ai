@@ -1,4 +1,5 @@
 import { handleAuth } from "./auth.js";
+import {handleExistingAccountApp} from './existing-account-app.mjs';
 // SmartTrade AI private quote gateway - not connected to public GitHub Pages.
 // Never place secrets in this source file or expose restricted quotes publicly.
 const allowed = new Set(["AAPL", "MSFT", "SPY"]);
@@ -29,6 +30,8 @@ export default {
       return result;
     }
     if (url.pathname === "/health" && request.method === "GET") return response({status:"ok",service:"smarttrade-private-gateway",quotes:"restricted"});
+    const accountApp=await handleExistingAccountApp(request,env,url);
+    if(accountApp)return accountApp;
     if (url.pathname !== "/api/quote") return response({error:"not_found"},404);
     if (request.method !== "GET") return response({error:"method_not_allowed"},405);
     const header=request.headers.get("authorization")||"";

@@ -3,3 +3,5 @@ production-readiness-report.json
 .dev.vars
 .wrangler/
 node_modules/
+existing-production-public/
+production-public/

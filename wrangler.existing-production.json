@@ -1,0 +1,16 @@
+{
+  "name": "smarttrade-ai",
+  "main": "cloudflare/src/index.js",
+  "compatibility_date": "2026-10-19",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./existing-production-public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "vars": {
+    "ACCOUNT_APP_ENABLED": "false",
+    "PORTFOLIO_SYNC_ENABLED": "false"
+  }
+}
