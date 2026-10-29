@@ -62,4 +62,4 @@ Run `npm.cmd run backup:production` with Cloudflare credentials in the environme
 
 ## Private Basic learning data
 
-The existing production account app supports manually requested AAPL/MSFT/SPY quotes for the authorized Google account when the explicit personal-learning policy is enabled. It uses the existing server key and a shared 8/minute, 800/day quota guard, without polling, public distribution or portfolio-price changes. See `docs/personal-market-learning.md` for scope, validation and disabling the feature.
+The existing production account app supports manually requested US stock and ETF prices from a shared 12-symbol catalog for the authorized Google account when the explicit personal-learning policy is enabled. It uses the existing server key and a shared 8/minute, 800/day quota guard, without polling, public distribution or portfolio-price changes. See `docs/personal-market-learning.md` for scope, validation and disabling the feature.

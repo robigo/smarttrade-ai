@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac} from 'node:crypto';
 import gateway from '../cloudflare/src/index.js';
+import {PERSONAL_SYMBOLS} from '../app/personal-market-symbols.mjs';
 const origin='https://smarttrade-ai.goshen-r.workers.dev';
 function environment(reserve=async()=>Response.json({allowed:true})){
  return {ACCOUNT_APP_ENABLED:'true',GOOGLE_APP_ORIGIN:origin,GOOGLE_CLIENT_ID:'test-client',GOOGLE_CLIENT_SECRET:'test-secret',GOOGLE_SESSION_SECRET:'s'.repeat(48),GOOGLE_ALLOWED_EMAIL:'owner@example.invalid',PORTFOLIO_SYNC_ENABLED:'true',PORTFOLIO_DB:{},ASSETS:{fetch:async()=>new Response('asset')},TWELVE_DATA_API_KEY:'synthetic-private-key',SMARTTRADE_ACCESS_TOKEN:'b'.repeat(48),MARKET_LEARNING_ENABLED:'true',MARKET_QUOTA_GUARD_READY:'true',MARKET_QUOTA:{idFromName:name=>name,get:id=>({fetch:async(...args)=>reserve(...args,id)})}};
@@ -12,6 +13,16 @@ function request(env,route,{anonymous=false,method='GET'}={}){
  return new Request(origin+route,{method,headers});
 }
 const quote={price:'123.45'};
+test('expanded private symbols reserve the same budget and reject unsupported or batched input',async t=>{
+ let reservations=0,calls=0;const env=environment(async()=>{reservations++;return Response.json({allowed:true})});
+ t.mock.method(globalThis,'fetch',async()=>{calls++;return Response.json(quote)});
+ const status=await gateway.fetch(request(env,'/api/market/status'),env);assert.deepEqual((await status.json()).symbols,PERSONAL_SYMBOLS);
+ assert.equal((await gateway.fetch(request(env,'/api/market/quote?symbol=NVDA',{anonymous:true}),env)).status,401);
+ for(const symbol of ['INVALID','NVDA,MSFT','aapl'])assert.equal((await gateway.fetch(request(env,'/api/market/quote?symbol='+encodeURIComponent(symbol)),env)).status,400);
+ assert.equal(reservations,0);assert.equal(calls,0);
+ for(const symbol of PERSONAL_SYMBOLS){const r=await gateway.fetch(request(env,'/api/market/quote?symbol='+symbol),env);assert.equal(r.status,200);assert.equal((await r.json()).symbol,symbol);}
+ assert.equal(reservations,PERSONAL_SYMBOLS.length);assert.equal(calls,reservations);
+});
 test('only explicit personal mode enables quotes; public display flag does not enable it',async()=>{
  const env=environment();const status=await gateway.fetch(request(env,'/api/market/status'),env);const data=await status.json();assert.equal(data.quotesEnabled,true);assert.equal(data.automaticPolling,false);
  delete env.MARKET_LEARNING_ENABLED;env.MARKET_DISPLAY_APPROVED='true';assert.equal((await (await gateway.fetch(request(env,'/api/market/status'),env)).json()).quotesEnabled,false);

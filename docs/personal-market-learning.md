@@ -10,7 +10,10 @@ is the only account allowed to use the browser quote endpoint.
 ## Behavior
 
 - `GET /api/market/status` and `GET /api/market/quote?symbol=AAPL` require a valid
-  existing Google session. Initially supported symbols: AAPL, MSFT and SPY.
+  existing Google session. The selection now includes AAPL, MSFT, NVDA, AMZN,
+  GOOGL, META, TSLA, AMD, INTC, NFLX, SPY and QQQ. The quote selector, watchlist
+  validation and private backend use one shared catalog. Saved watchlists and
+  simulation assets are preserved. Actual data access remains provider-dependent.
 - Quotes use the existing server-side secret. No API key is sent to browser code,
   a public repository, error messages or browser storage.
 - Quotes are requested only by a button click. There is no automatic polling,
