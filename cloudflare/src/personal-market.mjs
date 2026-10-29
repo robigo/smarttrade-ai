@@ -21,11 +21,12 @@ export async function fetchPersonalQuote(symbol,env){
    return json({error:'provider_quota_exceeded',retryAfterSeconds:retry},429,{'retry-after':String(retry)});
   }
   if(!reserved.ok)return json({error:'quota_guard_unavailable'},503);
-  const url=new URL('https://api.twelvedata.com/quote');url.searchParams.set('symbol',symbol);url.searchParams.set('apikey',env.TWELVE_DATA_API_KEY);
+  const url=new URL('https://api.twelvedata.com/quote');url.searchParams.set('symbol',symbol);url.searchParams.set('apikey',env.TWELVE_DATA_API_KEY.trim());
   const response=await fetch(url,{headers:{accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(8000)});
   let data;try{data=await response.json()}catch{return json({error:'invalid_provider_response'},502)}
   if(response.status===429||data.code===429)return json({error:'provider_quota_exceeded'},429);
-  if([401,403].includes(response.status)||[401,403].includes(data.code))return json({error:'provider_access_denied'},403);
+  if(response.status===401||data.code===401)return json({error:'provider_key_invalid',providerHttpStatus:response.status,providerCode:data.code===401?401:null},403);
+  if(response.status===403||data.code===403)return json({error:'provider_plan_restricted',providerHttpStatus:response.status,providerCode:data.code===403?403:null},403);
   if(!response.ok||data.status==='error')return json({error:'provider_unavailable'},502);
   const price=Number(data.close);
   if(data.symbol!==symbol||data.currency!=='USD'||!['string','number'].includes(typeof data.close)||!Number.isFinite(price)||price<=0)return json({error:'invalid_provider_response'},502);

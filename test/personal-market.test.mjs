@@ -44,3 +44,11 @@ test('provider access, quota, malformed data and transport errors are sanitized'
  for(const fixture of cases){const mock=t.mock.method(globalThis,'fetch',async()=>Response.json(fixture.body,{status:fixture.status}));const r=await gateway.fetch(request(env,'/api/market/quote?symbol=AAPL'),env);assert.equal(r.status,fixture.want);assert.ok(!(await r.text()).includes(env.TWELVE_DATA_API_KEY));mock.mock.restore();}
  t.mock.method(globalThis,'fetch',async()=>{throw Error('url contains '+env.TWELVE_DATA_API_KEY)});const r=await gateway.fetch(request(env,'/api/market/quote?symbol=AAPL'),env);assert.equal(r.status,502);assert.deepEqual(await r.json(),{error:'provider_unavailable'});
 });
+
+test('copied whitespace is trimmed and provider credential failures differ from plan restrictions',async t=>{
+ const env=environment();env.TWELVE_DATA_API_KEY='  synthetic-private-key\n';
+ for(const code of [401,403]){
+  const mock=t.mock.method(globalThis,'fetch',async url=>{assert.equal(new URL(url).searchParams.get('apikey'),'synthetic-private-key');return Response.json({code,message:'Never output '+env.TWELVE_DATA_API_KEY},{status:code})});
+  const r=await gateway.fetch(request(env,'/api/market/quote?symbol=AAPL'),env);const data=await r.json();assert.equal(r.status,403);assert.equal(data.error,code===401?'provider_key_invalid':'provider_plan_restricted');assert.equal(data.providerCode,code);assert.ok(!JSON.stringify(data).includes('synthetic-private-key'));mock.mock.restore();
+ }
+});
