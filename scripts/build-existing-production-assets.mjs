@@ -12,10 +12,11 @@ export function buildExistingProductionHtml(html){
  .replace('גישה למחירים עדיין אינה מופעלת.','שליפה ידנית ללמידה עצמית בלבד, לאחר התחברות. אין רענון אוטומטי.')
  .replace('המחירים ייטענו רק למשתמש Google מורשה ורק לאחר הפעלת רישוי בשרת. אין השפעה על מחירי הסימולציה או על שווי התיק.','שליפה ידנית דרך חשבון Basic למשתמש Google המורשה בלבד. עד 8 קרדיטים בדקה ו־800 ביום דרך כלי זה. אין השפעה על מחירי הסימולציה או על שווי התיק.')
  .replace('מעקב בלבד. עדיין אין מחירי Twelve Data בממשק הציבורי.','לשליפת מחיר פרטי ללמידה, לחץ על שלוף מחיר ליד הנייר לאחר התחברות. המחירים אינם מתעדכנים אוטומטית ואינם נשמרים לאחר רענון הדף.')
+ .replace('התפתחות שווי התיק לפי נקודות היסטוריה שמורות','התפתחות שווי תיק הסימולציה המקומי')
  .replace(/<select id="liveSymbol">[\s\S]*?<\/select>/,'<select id="liveSymbol">'+options+'</select>')
  .replace(/<select id="watchChoice">[\s\S]*?<\/select>/,'<select id="watchChoice">'+options+'</select>')
  .replace("watchAllowed=['AAPL','MSFT','SPY']",'watchAllowed='+JSON.stringify(PERSONAL_SYMBOLS))
- .replace('</html>','<script src="/personal-market-client.js"></script></html>');
+ .replace('</html>','<script src="/personal-market-client.js"></script><script type="module" src="/portfolio-chart.js"></script></html>');
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const root=path.resolve(import.meta.dirname,'..');
@@ -26,5 +27,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  fs.writeFileSync(path.join(output,'index.html'),personalHtml);
  fs.copyFileSync(path.join(root,'preview-public/account-client.js'),path.join(output,'account-client.js'));
  fs.copyFileSync(path.join(root,'app/personal-market-client.js'),path.join(output,'personal-market-client.js'));
+ fs.copyFileSync(path.join(root,'app/portfolio-chart.js'),path.join(output,'portfolio-chart.js'));
+ fs.copyFileSync(path.join(root,'app/portfolio-history-model.mjs'),path.join(output,'portfolio-history-model.mjs'));
  console.log('Built optional app assets for existing gateway; no new Worker or runtime changes.');
 }
