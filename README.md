@@ -55,3 +55,7 @@ See `docs/existing-production-adaptation.md` before any activation or production
 ## Active production deployment
 
 The existing Worker is active with account persistence. The owner confirmed Google login and save/refresh/reload on 2026-10-29. Use `npm.cmd run check:production` for a guarded dry-run or `npm.cmd run deploy:production` for an authorized release, with Cloudflare credentials supplied in the environment. These commands verify the live production DB fingerprint and preserve bindings/secrets. Do not deploy the legacy baseline config over the active account app. See `docs/existing-production-adaptation.md` for evidence and rollback.
+
+## Production account backups
+
+Run `npm.cmd run backup:production` with Cloudflare credentials in the environment on Windows. Archives are AES-256-GCM encrypted, with Windows-user-bound DPAPI keys. Each archive is reread and restored into isolated in-memory SQLite for verification. `npm.cmd run backup:verify -- "C:\path\backup.encrypted.json"` verifies it later without Cloudflare access. No live database writes occur. See `docs/production-backup-recovery.md` for recovery limits, Time Travel and incident handling.
