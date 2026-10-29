@@ -28,7 +28,7 @@ test('anonymous, wrong methods, unsupported symbols and missing guards make no p
 test('both private endpoints reserve the same persistent counter before upstream access',async t=>{
  const names=[];let reservations=0,calls=0;
  const env=environment(async(_url,options,id)=>{assert.equal(options.method,'POST');names.push(id);reservations++;return Response.json({allowed:true})});
- t.mock.method(globalThis,'fetch',async(url,options)=>{calls++;assert.equal(reservations,calls);assert.equal(new URL(url).pathname,'/price');assert.equal(new URL(url).searchParams.get('apikey'),env.TWELVE_DATA_API_KEY);assert.equal(options.redirect,'error');return Response.json(quote)});
+ t.mock.method(globalThis,'fetch',async(url,options)=>{calls++;assert.equal(reservations,calls);assert.equal(new URL(url).pathname,'/price');assert.equal(new URL(url).searchParams.get('apikey'),env.TWELVE_DATA_API_KEY);assert.equal(options.redirect,'manual');return Response.json(quote)});
  const a=await gateway.fetch(request(env,'/api/market/quote?symbol=AAPL'),env);const body=await a.text();assert.equal(a.status,200);assert.ok(!body.includes(env.TWELVE_DATA_API_KEY));assert.equal(JSON.parse(body).price,123.45);assert.equal(a.headers.get('cache-control'),'no-store');
  const b=await gateway.fetch(new Request(origin+'/api/quote?symbol=AAPL',{headers:{authorization:'Bearer '+env.SMARTTRADE_ACCESS_TOKEN}}),env);assert.equal(b.status,200);assert.deepEqual(names,['twelvedata-basic8-personal','twelvedata-basic8-personal']);assert.equal(calls,2);
 });
@@ -51,4 +51,9 @@ test('copied whitespace is trimmed and provider credential failures differ from 
   const mock=t.mock.method(globalThis,'fetch',async url=>{assert.equal(new URL(url).searchParams.get('apikey'),'synthetic-private-key');return Response.json({code,message:'Never output '+env.TWELVE_DATA_API_KEY},{status:code})});
   const r=await gateway.fetch(request(env,'/api/market/quote?symbol=AAPL'),env);const data=await r.json();assert.equal(r.status,403);assert.equal(data.error,code===401?'provider_key_invalid':'provider_plan_restricted');assert.equal(data.providerCode,code);assert.ok(!JSON.stringify(data).includes('synthetic-private-key'));mock.mock.restore();
  }
+});
+
+test('provider redirects are rejected without following or exposing the API key',async t=>{
+ let calls=0;const env=environment();t.mock.method(globalThis,'fetch',async(_url,options)=>{calls++;assert.equal(options.redirect,'manual');return new Response(null,{status:302,headers:{location:'https://other.invalid/private'}})});
+ const r=await gateway.fetch(request(env,'/api/market/quote?symbol=AAPL'),env);assert.equal(r.status,502);assert.deepEqual(await r.json(),{error:'provider_redirect_rejected'});assert.equal(calls,1);assert.equal(r.headers.get('location'),null);
 });
