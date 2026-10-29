@@ -15,3 +15,29 @@ No real-time market quotes, broker connection, real orders, AI model, FX convers
 
 ## Roadmap
 Market-data provider and licensing; tests; secure multi-user backend; broker integration only after separate security and regulatory review.
+
+## Account-service candidate
+
+`preview-public/account-client.js` adds an opt-in account portfolio panel, backed by
+`/api/private/portfolio` when a reviewed storage binding and feature flag are enabled.
+The local simulation portfolio remains separate. This candidate does not activate D1,
+configure secrets, enable provider calls, or authorize production rollout.
+
+Run the selected offline account tests with `npm run test:accounts`.
+The application uses ES modules; `server/quote-gateway.cjs` remains CommonJS.
+See `docs/d1-preview-activation-runbook.md` for the API contract, exact legacy data mapping,
+staged activation, and remaining live acceptance and recovery gates.
+
+## Preview CI deployment
+
+The deployment workflow resolves the existing approved D1 database by its name and
+identifier fingerprint in `deployment/preview-accounts.json`. It generates the ignored
+`wrangler.accounts-preview.json` and deploys only that config with `--keep-vars`.
+Missing or changed database metadata aborts deployment; CI never provisions a new database
+or executes SQL. The Cloudflare CI token must permit reading D1 metadata.
+Live market-provider access stays disabled, and separate budget diagnostic writes require
+an explicit manual workflow input. Run offline policy tests with:
+
+```sh
+node --test test/preview-deployment-config.test.mjs
+```

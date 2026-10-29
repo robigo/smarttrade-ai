@@ -14,15 +14,18 @@ export async function handlePrivatePortfolio(request,env,url){
  if(request.method==='GET'){
   try{
    const row=await env.PORTFOLIO_DB.prepare('SELECT version, snapshot_json FROM paper_portfolios WHERE owner_sub = ?').bind(owner).first();
-   if(!row)return reply({version:0,snapshot:initialPortfolio()});
+   if(!row)return reply({accountId:owner,version:0,snapshot:initialPortfolio()});
    const snapshot=JSON.parse(row.snapshot_json);
    if(!validatePortfolioLedger(snapshot).valid)return reply({error:'stored_portfolio_invalid'},503);
-   return reply({version:row.version,snapshot});
+   return reply({accountId:owner,version:row.version,snapshot});
   }catch{return reply({error:'storage_unavailable'},503)}
  }
  // Session cookies are sent automatically. Require an explicit same-origin
  // browser request to prevent cross-site writes; do not allow CORS.
  if(request.headers.get('Origin')!==url.origin)return reply({error:'invalid_origin'},403);
+ // Bind this draft to the account that loaded it. A changed session cookie
+ // must never save the previous account's draft into another user's account.
+ if(request.headers.get('X-Account-Id')!==owner)return reply({error:'account_changed'},403);
  if(!/^application\/json(?:\s*;|$)/i.test(request.headers.get('content-type')||''))return reply({error:'unsupported_media_type'},415);
  const length=Number(request.headers.get('content-length')||0);
  if(length>MAX_BYTES)return reply({error:'payload_too_large'},413);

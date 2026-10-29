@@ -1,0 +1,7 @@
+{
+  "worker": "smarttrade-ai-preview",
+  "database_name": "smarttrade-ai-preview-accounts-20261029",
+  "database_id_sha256": "35bace50f6e8db14a4dfa2a3e9213fdadd2b687cd68894351d0ee63d02083d42",
+  "binding": "PORTFOLIO_DB",
+  "sync_enabled": true
+}
