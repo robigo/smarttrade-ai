@@ -1,0 +1,5 @@
+wrangler.accounts-preview.json
+production-readiness-report.json
+.dev.vars
+.wrangler/
+node_modules/

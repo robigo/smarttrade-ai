@@ -1,6 +1,6 @@
 # SmartTrade AI — D1 Preview activation and rollback plan
 
-**Status: NOT ACTIVATED.** This document is a review checklist, not an authorization to provision resources or change Production.
+**Preview status: ACTIVATED on 2026-10-29 after explicit user approval. Production: NOT ACTIVATED.** The baseline tracked config remains unbound; the approved live Preview uses the ignored account-specific config described below. This document does not authorize Production changes.
 
 ## Scope
 - Target only the isolated Worker `smarttrade-ai-preview`.
@@ -35,7 +35,7 @@
 ## Production gate
 NO-GO until migration, real D1 restore, authenticated end-to-end tests, browser integration, monitoring, license-compliant market mode, owner acceptance and rollback rehearsal are documented. A 200 health response or green CI alone is insufficient.
 
-## Account UI candidate (not activated)
+## Account UI (active in isolated Preview)
 
 The candidate adds a separate Google account portfolio panel with explicit load, save,
 draft export, whole-share paper trades, and confirmed copying from the legacy local portfolio.
@@ -65,8 +65,49 @@ Changing the configured origin invalidates in-flight OAuth transactions.
 
 Local evidence uses the actual Worker and signed synthetic sessions with an in-memory
 database. It does not establish successful real Google sign-in, durable D1 storage,
-database restoration, or production readiness. The D1 binding and feature flag remain absent.
+database restoration, or production readiness. The D1 binding and feature flag remain absent from the baseline tracked config; the approved account-specific Preview deployment is recorded below.
 
 Before activation, explicitly authorize a dedicated Preview D1 database and its costs,
 review the existing migration, backup/export and retention policy, and run the staged rollout
 above. Do not reuse a production database or enable market-provider calls for these tests.
+
+## Approved activation evidence — 2026-10-29
+
+The user explicitly approved a new isolated Preview D1 resource and account activation.
+The reviewed schema was applied to the new empty database. The account candidate was
+first deployed with sync false, then enabled only after the remote storage drill passed.
+
+- Active Preview version: `5af49d67-bd60-42d9-8503-a7e214dedf48`.
+- Sync-disabled rollback target: `c829c134-4516-4d22-9087-d3ac02b7f8de`.
+- The Preview-only rollback and return to the active version were rehearsed successfully.
+- Twelve remote D1 checks passed using the actual account handler in Node and local,
+  synthetically signed test sessions. No live session was forged or secret read.
+- Checks covered initial save, versioned update, persistence, two-account isolation,
+  stale writes, origin/account guards, encrypted backup tamper detection and actual
+  restoration into the remote database. Only the two synthetic subjects were deleted;
+  the database was confirmed empty after the drill.
+- Backup encryption used AES-256-GCM with a key wrapped by Windows DPAPI CurrentUser.
+  The backup contains synthetic data only. This is not an unattended production backup policy.
+- Live Preview health returned 200; anonymous account/market access returned 401.
+  OAuth start returned 302 to Google with the correct Preview callback and secure cookie.
+- Thirty-eight browser checks passed against the deployed HTML and captured static script
+  with mocked API replies. Thirteen account integration cases passed separately in the
+  local 51-case browser suite. These counts do not claim a completed real Google login.
+
+Private configuration and database metadata are stored in the operator workspace as
+`wrangler.accounts-preview.json` (ignored by Git). Regenerate it with
+`scripts/write-preview-account-config.mjs` using reviewed `SMARTTRADE_PREVIEW_D1_ID`,
+`SMARTTRADE_PREVIEW_D1_NAME`, and `SMARTTRADE_PREVIEW_SYNC_ENABLED` environment values.
+Sync defaults to false; paid market-provider flags are always false in this generator.
+Deploy only this reviewed config with `--keep-vars`. The existing CI deployment still
+uses the unbound baseline config; do not merge/deploy this account branch through CI
+until its reviewed binding configuration is integrated, or cloud sync will be disabled.
+
+The guarded remote drill is `scripts/preview-d1-smoke.mjs`. It requires an explicit
+`SMARTTRADE_APPROVED_D1_SMOKE=1`, a sync-disabled config, a verified empty Preview database
+and the pinned Wrangler CLI. Run only while deployed account writes are disabled.
+It is an operator drill, not a CI test or a production data restore command.
+
+Remaining gates: real Google login/logout by the authorized human account, session lifecycle
+UAT, review of persistent user data retention/backup/incident ownership, production routing
+and configuration review, and final production Go/No-Go. Production remains NO-GO.
