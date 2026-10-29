@@ -4,6 +4,12 @@ on:
     branches:
       - preview/cloudflare-unified-v09
   workflow_dispatch:
+    inputs:
+      run_budget_diagnostics:
+        description: 'Run the separate budget-sandbox diagnostic storage probe'
+        required: false
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -64,7 +70,13 @@ jobs:
             echo "::error::Cloudflare Account ID must be exactly 32 hexadecimal characters (after normalization)."
             exit 1
           fi
-          npx --yes wrangler@4.151.2 deploy --config wrangler.preview.json
+          # Resolve the already approved database with read-only metadata access.
+          # Missing permissions, a missing DB or an identity mismatch stop deployment.
+          inventory_file="$(mktemp)"
+          trap 'rm -f "$inventory_file"' EXIT
+          npx --yes wrangler@4.151.2 d1 list --config wrangler.preview.json --json > "$inventory_file"
+          node scripts/prepare-preview-deployment.mjs "$inventory_file"
+          npx --yes wrangler@4.151.2 deploy --config wrangler.accounts-preview.json --keep-vars
       - name: Check preview health
         run: |
           node --input-type=module <<'JS'
@@ -95,7 +107,7 @@ jobs:
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
           const base='https://smarttrade-ai-preview.goshen-r.workers.dev';
-          for (const path of ['/api/market/status','/api/market/quote?symbol=AAPL']) {
+          for (const path of ['/api/market/status','/api/market/quote?symbol=AAPL','/api/private/portfolio']) {
             const response=await fetch(base+path,{
               headers:{accept:'application/json'},
               redirect:'manual',
@@ -279,7 +291,8 @@ jobs:
           console.log(JSON.stringify({stage:'codex_runner_dry_run',ready:false,reason:plan.reason,apiCallsMade:0}));
           JS
   github_oidc_signature_probe:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai' }}
+    # This separate diagnostic writes sandbox data; normal app deployment skips it.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_budget_diagnostics == true && github.ref == 'refs/heads/preview/cloudflare-unified-v09' && github.repository == 'robigo/smarttrade-ai' }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:

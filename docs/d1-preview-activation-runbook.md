@@ -99,9 +99,13 @@ Private configuration and database metadata are stored in the operator workspace
 `scripts/write-preview-account-config.mjs` using reviewed `SMARTTRADE_PREVIEW_D1_ID`,
 `SMARTTRADE_PREVIEW_D1_NAME`, and `SMARTTRADE_PREVIEW_SYNC_ENABLED` environment values.
 Sync defaults to false; paid market-provider flags are always false in this generator.
-Deploy only this reviewed config with `--keep-vars`. The existing CI deployment still
-uses the unbound baseline config; do not merge/deploy this account branch through CI
-until its reviewed binding configuration is integrated, or cloud sync will be disabled.
+Deploy only this reviewed config with `--keep-vars`. The candidate CI workflow now
+reads D1 inventory metadata and verifies the exact approved name and identifier fingerprint
+from `deployment/preview-accounts.json`, then generates the same ignored account config.
+Missing metadata permission, a missing database, duplicate matches or an identity mismatch
+stop deployment; there is no fallback to the unbound baseline config. The CI Cloudflare
+token needs D1 metadata-read permission in addition to the existing Worker deployment rights.
+This workflow change takes effect only after the account branch is merged into Preview.
 
 The guarded remote drill is `scripts/preview-d1-smoke.mjs`. It requires an explicit
 `SMARTTRADE_APPROVED_D1_SMOKE=1`, a sync-disabled config, a verified empty Preview database
@@ -111,3 +115,19 @@ It is an operator drill, not a CI test or a production data restore command.
 Remaining gates: real Google login/logout by the authorized human account, session lifecycle
 UAT, review of persistent user data retention/backup/incident ownership, production routing
 and configuration review, and final production Go/No-Go. Production remains NO-GO.
+
+## CI deployment preservation
+
+- The generated config keeps `PORTFOLIO_DB` and `PORTFOLIO_SYNC_ENABLED=true`, the existing
+  quota Durable Object, assets, and existing baseline variables.
+- `--keep-vars` preserves runtime environment settings; runtime secrets remain managed by Cloudflare.
+- `MARKET_DISPLAY_APPROVED` and `MARKET_QUOTA_GUARD_READY` are forced false. There is no
+  database creation, migration or SQL execution in normal CI deployment.
+- The post-deploy anonymous guard now includes `/api/private/portfolio` and expects 401.
+- The separate budget-sandbox diagnostic job writes diagnostic data. It now requires a
+  manual `workflow_dispatch` with `run_budget_diagnostics=true`; ordinary app pushes skip it.
+- Offline policy tests cover missing/replaced databases, malformed metadata, unsafe targets,
+  disabled sync and paid-provider flags. An actual D1 metadata read generated a config
+  identical to the active Preview config, and Wrangler dry-run and YAML parsing succeeded.
+- After merging, review the first deployment run's metadata-resolution and binding output.
+  An insufficiently scoped token must be corrected instead of bypassing the identity guard.
