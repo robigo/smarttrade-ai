@@ -30,14 +30,24 @@ staged activation, and remaining live acceptance and recovery gates.
 
 ## Preview CI deployment
 
-The deployment workflow resolves the existing approved D1 database by its name and
-identifier fingerprint in `deployment/preview-accounts.json`. It generates the ignored
+The deployment workflow reads the account-store binding already attached to the Worker
+and verifies its identifier fingerprint in `deployment/preview-accounts.json`. It generates the ignored
 `wrangler.accounts-preview.json` and deploys only that config with `--keep-vars`.
 Missing or changed database metadata aborts deployment; CI never provisions a new database
-or executes SQL. The Cloudflare CI token must permit reading D1 metadata.
+or executes SQL. It uses the existing Workers deployment permissions, not the D1 inventory API.
 Live market-provider access stays disabled, and separate budget diagnostic writes require
 an explicit manual workflow input. Run offline policy tests with:
 
 ```sh
 node --test test/preview-deployment-config.test.mjs
 ```
+
+## Existing production adaptation
+
+The separate-Worker experiment in PR #68 is on hold. `cloudflare/src/index.js` keeps
+the existing `smarttrade-ai` gateway, routes and credentials. Optional app/account paths
+are guarded by `ACCOUNT_APP_ENABLED=true` and remain absent by default.
+Build optional assets with `npm run build:existing-production` and run compatibility tests
+with `npm run test:existing-production`. `wrangler.existing-production.json` targets the
+same Worker with the feature disabled; it does not bind a database or change Google settings.
+See `docs/existing-production-adaptation.md` before any activation or production deployment.

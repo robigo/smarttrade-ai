@@ -100,11 +100,11 @@ Private configuration and database metadata are stored in the operator workspace
 `SMARTTRADE_PREVIEW_D1_NAME`, and `SMARTTRADE_PREVIEW_SYNC_ENABLED` environment values.
 Sync defaults to false; paid market-provider flags are always false in this generator.
 Deploy only this reviewed config with `--keep-vars`. The candidate CI workflow now
-reads D1 inventory metadata and verifies the exact approved name and identifier fingerprint
+reads existing Worker binding metadata and verifies the exact approved identifier fingerprint
 from `deployment/preview-accounts.json`, then generates the same ignored account config.
-Missing metadata permission, a missing database, duplicate matches or an identity mismatch
+Missing Workers metadata permission, a missing binding, duplicate matches or an identity mismatch
 stop deployment; there is no fallback to the unbound baseline config. The CI Cloudflare
-token needs D1 metadata-read permission in addition to the existing Worker deployment rights.
+token uses its existing Worker deployment rights. It no longer lists or queries D1 resources.
 This workflow change takes effect only after the account branch is merged into Preview.
 
 The guarded remote drill is `scripts/preview-d1-smoke.mjs`. It requires an explicit
@@ -126,8 +126,15 @@ and configuration review, and final production Go/No-Go. Production remains NO-G
 - The post-deploy anonymous guard now includes `/api/private/portfolio` and expects 401.
 - The separate budget-sandbox diagnostic job writes diagnostic data. It now requires a
   manual `workflow_dispatch` with `run_budget_diagnostics=true`; ordinary app pushes skip it.
-- Offline policy tests cover missing/replaced databases, malformed metadata, unsafe targets,
-  disabled sync and paid-provider flags. An actual D1 metadata read generated a config
+- Offline policy tests cover missing/replaced bindings, malformed metadata, unsafe targets,
+  disabled sync and paid-provider flags. An actual Worker settings read generated a config
   identical to the active Preview config, and Wrangler dry-run and YAML parsing succeeded.
-- After merging, review the first deployment run's metadata-resolution and binding output.
-  An insufficiently scoped token must be corrected instead of bypassing the identity guard.
+- After merging, review the deployment run's Worker-binding resolution and binding output.
+  A failing Workers authentication request must stop deployment; never bypass the identity guard.
+
+The original CI D1-list lookup returned error 10000 because it required direct D1 access.
+It was replaced with the existing Worker's settings endpoint. Cloudflare documents that
+Worker deployment with bindings requires Worker Editor access, without separate bound-resource
+permissions: https://developers.cloudflare.com/workers/authorization/workers/ .
+The binding UUID is still fingerprint-checked; this is a narrower metadata source, not a
+fallback that skips validation. No token change is required merely to list D1 databases now.

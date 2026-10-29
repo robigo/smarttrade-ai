@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {resolvePreviewDeploymentConfig} from './preview-deployment-config.mjs';
 const root=path.resolve(import.meta.dirname,'..');
-if(process.argv.length!==3)throw Error('Provide a successful Wrangler D1 inventory JSON file');
+if(process.argv.length!==3)throw Error('Provide existing Worker binding metadata JSON');
 const read=file=>JSON.parse(fs.readFileSync(file,'utf8'));
 const cfg=resolvePreviewDeploymentConfig(
   read(path.join(root,'wrangler.preview.json')),

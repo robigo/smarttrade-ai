@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
-import {buildPreviewAccountConfig,resolvePreviewDeploymentConfig} from '../scripts/preview-deployment-config.mjs';
+import {buildPreviewAccountConfig,resolvePreviewDeploymentConfig,readPreviewWorkerBindings} from '../scripts/preview-deployment-config.mjs';
 const id='11111111-2222-4333-8444-555555555555';
 const name='smarttrade-ai-preview-accounts-test';
 const base=()=>({name:'smarttrade-ai-preview',main:'cloudflare/src/preview.js',workers_dev:true,preview_urls:false,assets:{directory:'./preview-public',binding:'ASSETS'},durable_objects:{bindings:[{name:'MARKET_QUOTA',class_name:'MarketQuota'}]},vars:{EXISTING_SETTING:'keep-me',MARKET_DISPLAY_APPROVED:'true'}});
 const policy=()=>({worker:'smarttrade-ai-preview',binding:'PORTFOLIO_DB',sync_enabled:true,database_name:name,database_id_sha256:createHash('sha256').update(id).digest('hex')});
-const inventory=()=>[{name:'some-unrelated-database',uuid:'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'},{name,uuid:id}];
+const inventory=()=>[{name:'UNRELATED_DB',type:'d1',id:'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'},{name:'PORTFOLIO_DB',type:'d1',id}];
 
 test('resolved CI config preserves the exact approved DB, account sync and existing bindings',()=>{
  const input=base(),before=structuredClone(input);
@@ -25,15 +25,15 @@ test('paid provider flags remain disabled even if baseline vars enabled them',()
  assert.equal(result.vars.MARKET_QUOTA_GUARD_READY,'false');
  assert.equal(result.vars.GOOGLE_APP_ORIGIN,'https://smarttrade-ai-preview.goshen-r.workers.dev');
 });
-test('missing, malformed and duplicate database inventory stops deployment',()=>{
- for(const values of [[],{},null,[{name,uuid:id},{name,uuid:id}]])assert.throws(()=>resolvePreviewDeploymentConfig(base(),policy(),values));
+test('missing, malformed and duplicate Worker binding metadata stops deployment',()=>{
+ for(const values of [[],{},null,[{name:'PORTFOLIO_DB',type:'d1',id},{name:'PORTFOLIO_DB',type:'d1',id}]])assert.throws(()=>resolvePreviewDeploymentConfig(base(),policy(),values));
 });
 test('a replacement database with the same name cannot silently receive user portfolios',()=>{
- assert.throws(()=>resolvePreviewDeploymentConfig(base(),policy(),[{name,uuid:'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'}]),/identity changed/);
+ assert.throws(()=>resolvePreviewDeploymentConfig(base(),policy(),[{name:'PORTFOLIO_DB',type:'d1',id:'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'}]),/identity changed/);
 });
 test('a matching fingerprint does not permit a malformed database identifier',()=>{
  const p=policy();p.database_id_sha256=createHash('sha256').update('not-a-uuid').digest('hex');
- assert.throws(()=>resolvePreviewDeploymentConfig(base(),p,[{name,uuid:'not-a-uuid'}]),/database ID/);
+ assert.throws(()=>resolvePreviewDeploymentConfig(base(),p,[{name:'PORTFOLIO_DB',type:'d1',id:'not-a-uuid'}]),/database ID/);
 });
 test('production targets, assets and unexpected workers-dev routing are rejected',()=>{
  for(const change of [{name:'smarttrade-ai'},{main:'cloudflare/src/index.js'},{assets:{directory:'.'}},{workers_dev:false},{preview_urls:true}]){
@@ -56,8 +56,9 @@ test('checked-in policy names the approved isolated Preview resource without pub
 });
 test('workflow deploys only the resolved config and preserves runtime variables',()=>{
  const workflow=fs.readFileSync(new URL('../.github/workflows/preview-deploy.yml',import.meta.url),'utf8');
- assert.match(workflow,/d1 list .*--json > "\$inventory_file"/);
- assert.match(workflow,/node scripts\/prepare-preview-deployment\.mjs "\$inventory_file"/);
+ assert.match(workflow,/node scripts\/fetch-preview-worker-bindings\.mjs > "\$bindings_file"/);
+ assert.doesNotMatch(workflow,/wrangler@[^\n]+ d1 list/);
+ assert.match(workflow,/node scripts\/prepare-preview-deployment\.mjs "\$bindings_file"/);
  assert.match(workflow,/deploy --config wrangler\.accounts-preview\.json --keep-vars/);
  assert.doesNotMatch(workflow,/deploy --config wrangler\.preview\.json/);
  assert.doesNotMatch(workflow,/d1 (create|execute|migrations apply)/);
@@ -68,4 +69,23 @@ test('budget diagnostic writes require explicit manual dispatch, not ordinary ap
  const job=workflow.slice(workflow.indexOf('  github_oidc_signature_probe:'));
  assert.match(job,/github\.event_name == 'workflow_dispatch' && inputs\.run_budget_diagnostics == true/);
  assert.match(workflow,/run_budget_diagnostics:[\s\S]*?default: false/);
+});
+
+test('Worker metadata lookup uses only the fixed Workers API and strips unrelated settings',async()=>{
+ let calls=0;
+ const bindings=await readPreviewWorkerBindings({accountId:'a'.repeat(32),token:'synthetic-token',fetchImpl:async(url,options)=>{
+  calls++;assert.equal(url,'https://api.cloudflare.com/client/v4/accounts/'+'a'.repeat(32)+'/workers/scripts/smarttrade-ai-preview/settings');
+  assert.equal(options.method,'GET');assert.equal(options.redirect,'error');
+  assert.equal(options.headers.authorization,'Bearer synthetic-token');
+  return new Response(JSON.stringify({success:true,result:{bindings:[{type:'secret_text',name:'GOOGLE_CLIENT_SECRET',text:'must-not-be-output'},{name:'PORTFOLIO_DB',type:'d1',id,extra:'not-needed'}]}}));
+ }});
+ assert.equal(calls,1);assert.deepEqual(bindings,[{name:'PORTFOLIO_DB',type:'d1',id}]);
+});
+test('failed Worker metadata authentication never falls back to database listing or deployment',async()=>{
+ let calls=0;
+ await assert.rejects(readPreviewWorkerBindings({accountId:'a'.repeat(32),token:'synthetic-token',fetchImpl:async()=>{calls++;return new Response(JSON.stringify({success:false,errors:[{code:10000,message:'do-not-log-response'}]}),{status:403});}}),/HTTP 403, code 10000/);
+ assert.equal(calls,1);
+});
+test('a same-name binding of another resource type cannot become the account store',()=>{
+ assert.throws(()=>resolvePreviewDeploymentConfig(base(),policy(),[{name:'PORTFOLIO_DB',type:'kv_namespace',id}]),/D1 binding/);
 });
