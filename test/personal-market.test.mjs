@@ -11,7 +11,7 @@ function request(env,route,{anonymous=false,method='GET'}={}){
  const headers=anonymous?{}:{cookie:'st_session='+data+'.'+createHmac('sha256',env.GOOGLE_SESSION_SECRET).update(data).digest('base64url')};
  return new Request(origin+route,{method,headers});
 }
-const quote={symbol:'AAPL',currency:'USD',close:'123.45',datetime:'2026-10-29'};
+const quote={price:'123.45'};
 test('only explicit personal mode enables quotes; public display flag does not enable it',async()=>{
  const env=environment();const status=await gateway.fetch(request(env,'/api/market/status'),env);const data=await status.json();assert.equal(data.quotesEnabled,true);assert.equal(data.automaticPolling,false);
  delete env.MARKET_LEARNING_ENABLED;env.MARKET_DISPLAY_APPROVED='true';assert.equal((await (await gateway.fetch(request(env,'/api/market/status'),env)).json()).quotesEnabled,false);
@@ -28,7 +28,7 @@ test('anonymous, wrong methods, unsupported symbols and missing guards make no p
 test('both private endpoints reserve the same persistent counter before upstream access',async t=>{
  const names=[];let reservations=0,calls=0;
  const env=environment(async(_url,options,id)=>{assert.equal(options.method,'POST');names.push(id);reservations++;return Response.json({allowed:true})});
- t.mock.method(globalThis,'fetch',async(url,options)=>{calls++;assert.equal(reservations,calls);assert.equal(new URL(url).searchParams.get('apikey'),env.TWELVE_DATA_API_KEY);assert.equal(options.redirect,'error');return Response.json(quote)});
+ t.mock.method(globalThis,'fetch',async(url,options)=>{calls++;assert.equal(reservations,calls);assert.equal(new URL(url).pathname,'/price');assert.equal(new URL(url).searchParams.get('apikey'),env.TWELVE_DATA_API_KEY);assert.equal(options.redirect,'error');return Response.json(quote)});
  const a=await gateway.fetch(request(env,'/api/market/quote?symbol=AAPL'),env);const body=await a.text();assert.equal(a.status,200);assert.ok(!body.includes(env.TWELVE_DATA_API_KEY));assert.equal(JSON.parse(body).price,123.45);assert.equal(a.headers.get('cache-control'),'no-store');
  const b=await gateway.fetch(new Request(origin+'/api/quote?symbol=AAPL',{headers:{authorization:'Bearer '+env.SMARTTRADE_ACCESS_TOKEN}}),env);assert.equal(b.status,200);assert.deepEqual(names,['twelvedata-basic8-personal','twelvedata-basic8-personal']);assert.equal(calls,2);
 });
@@ -40,9 +40,9 @@ test('quota denials and storage failures stop before upstream requests',async t=
 });
 test('provider access, quota, malformed data and transport errors are sanitized',async t=>{
  const env=environment();
- const cases=[{body:{code:401,message:env.TWELVE_DATA_API_KEY},status:200,want:403},{body:{code:429},status:429,want:429},{body:{...quote,currency:'EUR'},status:200,want:502},{body:{...quote,close:'NaN'},status:200,want:502},{body:{...quote,symbol:'MSFT'},status:200,want:502}];
+ const cases=[{body:{code:401,message:env.TWELVE_DATA_API_KEY},status:200,want:403},{body:{code:429},status:429,want:429},{body:{...quote,currency:'EUR'},status:200,want:502},{body:{...quote,price:'NaN'},status:200,want:502},{body:{...quote,symbol:'MSFT'},status:200,want:502}];
  for(const fixture of cases){const mock=t.mock.method(globalThis,'fetch',async()=>Response.json(fixture.body,{status:fixture.status}));const r=await gateway.fetch(request(env,'/api/market/quote?symbol=AAPL'),env);assert.equal(r.status,fixture.want);assert.ok(!(await r.text()).includes(env.TWELVE_DATA_API_KEY));mock.mock.restore();}
- t.mock.method(globalThis,'fetch',async()=>{throw Error('url contains '+env.TWELVE_DATA_API_KEY)});const r=await gateway.fetch(request(env,'/api/market/quote?symbol=AAPL'),env);assert.equal(r.status,502);assert.deepEqual(await r.json(),{error:'provider_unavailable'});
+ t.mock.method(globalThis,'fetch',async()=>{throw Error('url contains '+env.TWELVE_DATA_API_KEY)});const r=await gateway.fetch(request(env,'/api/market/quote?symbol=AAPL'),env);assert.equal(r.status,502);assert.deepEqual(await r.json(),{error:'provider_connection_failed'});
 });
 
 test('copied whitespace is trimmed and provider credential failures differ from plan restrictions',async t=>{
