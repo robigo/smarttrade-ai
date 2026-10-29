@@ -4,7 +4,7 @@
  el('authState').textContent='שליפת נתונים פרטית ללמידה עצמית בלבד. נדרשת התחברות Google.';
  el('liveQuoteButton').textContent='שלוף מחיר ללמידה';
  const button=el('liveQuoteButton'),output=el('liveQuoteResult');
- const messages={market_display_disabled:'שליפת נתונים עדיין כבויה.',provider_access_denied:'הספק דחה את הגישה. יש לבדוק את המפתח ואת הרשאת המסלול לסימול.',provider_not_configured:'חיבור הספק אינו מוגדר.',quota_guard_unavailable:'בקרת המכסה אינה זמינה. לא נשלחה בקשה לספק.',unsupported_symbol:'הסימול אינו נתמך בשלב זה.',invalid_provider_response:'הספק החזיר נתון שלא ניתן לאמת.',provider_unavailable:'הספק אינו זמין כרגע.'};
+ const messages={market_display_disabled:'שליפת נתונים עדיין כבויה.',provider_access_denied:'הספק דחה את הגישה. יש לבדוק את המפתח ואת הרשאת המסלול לסימול.',provider_key_invalid:'Twelve Data דחה את מפתח ה־API (401). יש לעדכן את המפתח בהגדרות השרת; אין לשלוח אותו בצ׳אט.',provider_plan_restricted:'Twelve Data חסם את הבקשה במסגרת הרשאות החשבון או הסימול (403). לא בוצע שדרוג מנוי.',provider_not_configured:'חיבור הספק אינו מוגדר.',quota_guard_unavailable:'בקרת המכסה אינה זמינה. לא נשלחה בקשה לספק.',unsupported_symbol:'הסימול אינו נתמך בשלב זה.',invalid_provider_response:'הספק החזיר נתון שלא ניתן לאמת.',provider_unavailable:'הספק אינו זמין כרגע.'};
  button.onclick=async()=>{
   button.disabled=true;output.textContent='שולף נתון ללמידה...';
   try{
