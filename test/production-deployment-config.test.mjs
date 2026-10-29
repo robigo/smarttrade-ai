@@ -7,6 +7,15 @@ const id='11111111-2222-4333-8444-555555555555';
 const base=()=>JSON.parse(fs.readFileSync(new URL('../wrangler.existing-production.json',import.meta.url)));
 const policy=()=>({worker:'smarttrade-ai',binding:'PORTFOLIO_DB',sync_enabled:true,database_name:'smarttrade-ai-production-accounts-test',database_id_sha256:createHash('sha256').update(id).digest('hex')});
 const bindings=()=>[{name:'PORTFOLIO_DB',type:'d1',id}];
+
+test('personal learning needs an explicit policy and preserves its quota namespace when switched off',()=>{
+ for(const enabled of [true,false]){
+  const cfg=resolve(base(),{...policy(),personal_learning:enabled},bindings());
+  assert.equal(cfg.vars.MARKET_LEARNING_ENABLED,String(enabled));assert.equal(cfg.vars.MARKET_DISPLAY_APPROVED,'false');assert.equal(cfg.vars.MARKET_QUOTA_GUARD_READY,'true');
+  assert.deepEqual(cfg.durable_objects.bindings,[{name:'MARKET_QUOTA',class_name:'MarketQuota'}]);assert.equal(cfg.migrations[0].new_sqlite_classes[0],'MarketQuota');
+ }
+ assert.throws(()=>resolve(base(),{...policy(),personal_learning:'true'},bindings()));
+});
 test('production config preserves the existing worker, exact storage and account origin',()=>{
  const input=base(),before=structuredClone(input),cfg=resolve(input,policy(),bindings());
  assert.deepEqual(input,before);assert.equal(cfg.name,'smarttrade-ai');assert.equal(cfg.d1_databases[0].database_id,id);

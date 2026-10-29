@@ -3,5 +3,6 @@
   "database_name": "smarttrade-ai-production-accounts-20261029",
   "database_id_sha256": "f8763827fac19d6672ad1ebeef1cbd2b06c2c0e3b378a0b559acff8f1ed94371",
   "binding": "PORTFOLIO_DB",
-  "sync_enabled": true
+  "sync_enabled": true,
+  "personal_learning": true
 }

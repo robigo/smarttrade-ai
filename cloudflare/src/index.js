@@ -1,5 +1,7 @@
 import { handleAuth } from "./auth.js";
 import {handleExistingAccountApp} from './existing-account-app.mjs';
+import {fetchPersonalQuote} from './personal-market.mjs';
+export {MarketQuota} from './market-quota-do.mjs';
 // SmartTrade AI private quote gateway - not connected to public GitHub Pages.
 // Never place secrets in this source file or expose restricted quotes publicly.
 const allowed = new Set(["AAPL", "MSFT", "SPY"]);
@@ -39,6 +41,7 @@ export default {
     if (!env.TWELVE_DATA_API_KEY) return response({error:"server_not_configured"},503);
     const symbol=url.searchParams.get("symbol");
     if (!allowed.has(symbol)) return response({error:"unsupported_symbol"},400);
+    if(env.MARKET_QUOTA_GUARD_READY==='true')return fetchPersonalQuote(symbol,env);
     try {
       const endpoint=new URL("https://api.twelvedata.com/quote");
       endpoint.searchParams.set("symbol",symbol);
