@@ -59,3 +59,7 @@ The existing Worker is active with account persistence. The owner confirmed Goog
 ## Production account backups
 
 Run `npm.cmd run backup:production` with Cloudflare credentials in the environment on Windows. Archives are AES-256-GCM encrypted, with Windows-user-bound DPAPI keys. Each archive is reread and restored into isolated in-memory SQLite for verification. `npm.cmd run backup:verify -- "C:\path\backup.encrypted.json"` verifies it later without Cloudflare access. No live database writes occur. See `docs/production-backup-recovery.md` for recovery limits, Time Travel and incident handling.
+
+## Private Basic learning data
+
+The existing production account app supports manually requested AAPL/MSFT/SPY quotes for the authorized Google account when the explicit personal-learning policy is enabled. It uses the existing server key and a shared 8/minute, 800/day quota guard, without polling, public distribution or portfolio-price changes. See `docs/personal-market-learning.md` for scope, validation and disabling the feature.

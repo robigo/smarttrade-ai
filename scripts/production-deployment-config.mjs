@@ -11,6 +11,13 @@ export function resolveProductionDeploymentConfig(base,policy,bindings){
  const cfg=structuredClone(base);
  cfg.d1_databases=[{binding:policy.binding,database_name:policy.database_name,database_id:id}];
  cfg.vars={...cfg.vars,ACCOUNT_APP_ENABLED:'true',PORTFOLIO_SYNC_ENABLED:'true',GOOGLE_APP_ORIGIN:'https://smarttrade-ai.goshen-r.workers.dev',MARKET_DISPLAY_APPROVED:'false',MARKET_QUOTA_GUARD_READY:'false'};
+ if(policy.personal_learning!==undefined){
+  if(typeof policy.personal_learning!=='boolean')throw Error('Personal learning policy must be boolean');
+  cfg.durable_objects={bindings:[{name:'MARKET_QUOTA',class_name:'MarketQuota'}]};
+  cfg.migrations=[{tag:'v1_personal_market_quota',new_sqlite_classes:['MarketQuota']}];
+  cfg.vars.MARKET_QUOTA_GUARD_READY='true';
+  cfg.vars.MARKET_LEARNING_ENABLED=String(policy.personal_learning);
+ }
  return cfg;
 }
 
