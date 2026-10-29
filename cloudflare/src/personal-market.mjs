@@ -22,7 +22,10 @@ export async function fetchPersonalQuote(symbol,env){
   }
   if(!reserved.ok)return json({error:'quota_guard_unavailable'},503);
   const url=new URL('https://api.twelvedata.com/price');url.searchParams.set('symbol',symbol);url.searchParams.set('apikey',env.TWELVE_DATA_API_KEY.trim());
-  const response=await fetch(url,{headers:{accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(8000)});
+  // workerd rejects redirect:"error" before sending a request. Manual mode
+  // prevents forwarding the API key to any redirect target on this runtime.
+  const response=await fetch(url,{headers:{accept:'application/json'},redirect:'manual',signal:AbortSignal.timeout(8000)});
+  if(response.status>=300&&response.status<400)return json({error:'provider_redirect_rejected'},502);
   let data;try{data=await response.json()}catch{return json({error:'invalid_provider_response'},502)}
   if(!data||typeof data!=='object'||Array.isArray(data))return json({error:'invalid_provider_response'},502);
   if(response.status===429||data.code===429)return json({error:'provider_quota_exceeded'},429);
