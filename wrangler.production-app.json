@@ -1,0 +1,19 @@
+{
+  "name": "smarttrade-ai-app",
+  "main": "cloudflare/src/production-app.mjs",
+  "compatibility_date": "2026-10-19",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./production-public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "vars": {
+    "APP_ENVIRONMENT": "production",
+    "GOOGLE_APP_ORIGIN": "https://smarttrade-ai-app.goshen-r.workers.dev",
+    "PORTFOLIO_SYNC_ENABLED": "false",
+    "MARKET_DISPLAY_APPROVED": "false",
+    "MARKET_QUOTA_GUARD_READY": "false"
+  }
+}

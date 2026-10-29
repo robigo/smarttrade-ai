@@ -1,4 +1,6 @@
 wrangler.accounts-preview.json
+wrangler.production-app.generated.json
+production-public/
 production-readiness-report.json
 .dev.vars
 .wrangler/

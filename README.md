@@ -41,3 +41,13 @@ an explicit manual workflow input. Run offline policy tests with:
 ```sh
 node --test test/preview-deployment-config.test.mjs
 ```
+
+## Separate production website candidate
+
+`wrangler.production-app.json` and `cloudflare/src/production-app.mjs` prepare the
+approved `smarttrade-ai-app` target without overwriting the existing gateway or binding
+Preview data. Build with `npm run build:production-app` and test with
+`npm run test:production-app`. The `/ready` endpoint returns 503 until required runtime
+configuration is present. Paid market calls remain disabled in the wrapper.
+See `docs/production-app-rollout.md` for the CI-token blocker, production OAuth callback,
+separate storage/secrets and the remaining release steps. This candidate is not deployed.
